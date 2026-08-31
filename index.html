@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>婕樂纖 · 我的收支盈利表</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+
+:root{
+  --ink:#241B2F;
+  --ink-soft:#6B5E70;
+  --paper:#F7F1F4;
+  --card:#FFFFFF;
+  --rose:#C15C7C;
+  --rose-dark:#9E4763;
+  --gold:#B8863E;
+  --gold-soft:#EFE1C8;
+  --brick:#A6483F;
+  --brick-soft:#F3DFDD;
+  --forest:#3F6E52;
+  --forest-soft:#DEEAE2;
+  --line:#E7DEE4;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;overflow:hidden;}
+body{background:var(--paper);color:var(--ink);font-family:'Noto Sans TC',sans-serif;-webkit-font-smoothing:antialiased;}
+.app{max-width:520px;margin:0 auto;height:100vh;height:100dvh;background:var(--paper);position:relative;display:flex;flex-direction:column;overflow:hidden;}
+.hd{background:var(--ink);color:#fff;padding:22px 20px 18px;border-radius:0 0 22px 22px;flex-shrink:0;}
+.hd h1{font-family:'Noto Serif TC',serif;font-weight:900;font-size:21px;margin:0 0 2px;letter-spacing:.5px;}
+.hd .sub{font-size:12px;color:#C9BFD0;margin-bottom:14px;}
+.tier-row{display:flex;align-items:center;gap:8px;}
+.tier-row label{font-size:12px;color:#C9BFD0;}
+.tier-select{flex:1;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;padding:8px 10px;font-size:14px;font-weight:700;}
+.tier-select option{color:#000;}
+
+.tabs{display:flex;gap:6px;padding:14px 16px 0;flex-shrink:0;}
+.tab{flex:1;text-align:center;padding:10px 4px;border-radius:12px;font-size:13px;font-weight:700;color:var(--ink-soft);background:var(--card);border:1px solid var(--line);cursor:pointer;transition:.15s;}
+.tab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+
+.scrollpane{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.section{padding:14px 16px 4px;}
+.cat-tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;}
+.cat-tab{white-space:nowrap;padding:7px 14px;border-radius:999px;font-size:12.5px;font-weight:700;background:var(--card);border:1px solid var(--line);color:var(--ink-soft);cursor:pointer;}
+.cat-tab.active{background:var(--rose);border-color:var(--rose);color:#fff;}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 12px 10px;cursor:pointer;transition:.15s;}
+.pcard:active{transform:scale(.97);}
+.pcard .pname{font-weight:700;font-size:13.5px;line-height:1.3;margin-bottom:2px;}
+.pcard .pspec{font-size:11px;color:var(--ink-soft);margin-bottom:8px;}
+.pcard .pcost{font-size:11px;color:var(--ink-soft);}
+.pcard .pcost b{color:var(--brick);font-variant-numeric:tabular-nums;font-size:14px;}
+
+.fixed-list,.split-list{display:flex;flex-direction:column;gap:8px;}
+.fixed-item{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;cursor:pointer;}
+.fixed-item .fname{font-weight:700;font-size:13.5px;}
+.fixed-item .famt{font-weight:900;font-variant-numeric:tabular-nums;font-size:14px;}
+.famt.pos{color:var(--forest);}
+.famt.neg{color:var(--brick);}
+
+.custom-form{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px;}
+.custom-form h3{margin:0 0 10px;font-size:13.5px;font-family:'Noto Serif TC',serif;}
+.custom-form .row{display:flex;gap:8px;margin-bottom:8px;}
+.custom-form input, .custom-form select{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:13px;background:#fdfbfc;font-family:inherit;}
+.btn{border:none;border-radius:10px;padding:10px 14px;font-weight:700;font-size:13px;cursor:pointer;}
+.btn-gold{background:var(--gold);color:#fff;}
+.btn-ghost{background:var(--paper);color:var(--ink);border:1px solid var(--line);}
+.btn-full{width:100%;}
+
+/* modal */
+.overlay{position:absolute;inset:0;background:rgba(36,27,47,.55);display:none;align-items:flex-end;justify-content:center;z-index:50;}
+.overlay.show{display:flex;}
+.sheet{background:#fff;width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:16px 18px 24px;max-height:82vh;overflow-y:auto;}
+.sheet-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:2px;}
+.sheet h2{font-family:'Noto Serif TC',serif;font-size:17px;margin:0;}
+.sheet .spec{font-size:12px;color:var(--ink-soft);margin-bottom:14px;}
+.sheet-close{flex-shrink:0;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;}
+.opt-group{margin-bottom:14px;}
+.opt-label{font-size:11.5px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;letter-spacing:.5px;}
+.opt-btn{display:flex;justify-content:space-between;align-items:center;width:100%;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:7px;font-size:13.5px;font-weight:600;cursor:pointer;text-align:left;}
+.opt-btn:active{background:var(--gold-soft);}
+.opt-btn .price{font-weight:900;color:var(--rose-dark);font-variant-numeric:tabular-nums;}
+.opt-btn .spread{font-size:11px;color:var(--forest);font-weight:700;}
+.split-row{display:flex;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 13px;margin-bottom:7px;}
+.split-row input[type=number]{width:56px;text-align:center;border:1px solid var(--line);border-radius:8px;padding:6px;font-size:14px;}
+.opt-btn.selected{background:var(--gold-soft);border-color:var(--gold);}
+.footer-panel{margin-top:4px;background:var(--paper);border:1px solid var(--gold);border-radius:12px;padding:13px;}
+.footer-panel .fp-label{font-size:11.5px;font-weight:700;color:var(--ink-soft);margin-bottom:8px;}
+.footer-panel .fp-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.footer-panel .fp-row .fld{flex:1;}
+.footer-panel .fp-row .fld-lab{font-size:10.5px;color:var(--ink-soft);margin-bottom:3px;}
+.footer-panel input[type=number]{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 9px;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;}
+.footer-panel .fp-spread{font-size:11.5px;color:var(--forest);font-weight:700;margin-bottom:10px;}
+
+/* cart items in log/dashboard */
+.line{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px;}
+.line-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.line-name{font-weight:700;font-size:13.5px;}
+.line-meta{font-size:11px;color:var(--ink-soft);margin-top:1px;}
+.line-del{background:none;border:none;color:var(--ink-soft);font-size:16px;cursor:pointer;padding:0 2px;}
+.spreadbar{height:9px;border-radius:5px;overflow:hidden;display:flex;background:var(--line);}
+.spreadbar .seg-cost{background:var(--brick);}
+.spreadbar .seg-profit{background:var(--forest);}
+.line-nums{display:flex;justify-content:space-between;font-size:11px;margin-top:5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
+.line-nums b{color:var(--ink);}
+
+.empty{text-align:center;color:var(--ink-soft);font-size:13px;padding:40px 20px;}
+
+/* order history cards */
+.order-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:10px;}
+.order-head{display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+.order-head .oname{font-weight:700;font-size:14px;}
+.order-head .odate{font-size:11px;color:var(--ink-soft);}
+.order-stats{display:flex;gap:14px;margin-top:8px;font-size:12px;}
+.order-stats span b{font-variant-numeric:tabular-nums;}
+.order-detail{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px;display:none;}
+.order-detail.show{display:block;}
+.order-del{margin-top:10px;}
+
+/* bottom cart bar */
+.cartbar{background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(36,27,47,.08);flex-shrink:0;}
+.cartbar-inner{max-width:520px;margin:0 auto;padding:12px 16px 16px;}
+.stat-row{display:flex;justify-content:space-between;margin-bottom:10px;}
+.stat{text-align:left;}
+.stat .lab{font-size:10.5px;color:var(--ink-soft);}
+.stat .val{font-weight:900;font-size:16px;font-variant-numeric:tabular-nums;}
+.stat.rev .val{color:var(--rose-dark);}
+.stat.cost .val{color:var(--brick);}
+.stat.profit .val{color:var(--forest);}
+.stat.margin .val{color:var(--gold);}
+.cart-items{max-height:160px;overflow-y:auto;margin-bottom:10px;}
+.cart-note{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:13px;margin-bottom:9px;font-family:inherit;}
+.cart-btns{display:flex;gap:8px;}
+
+.dash-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;}
+.dash-big{display:flex;justify-content:space-between;text-align:center;}
+.dash-big .d-item .d-lab{font-size:11px;color:var(--ink-soft);margin-bottom:4px;}
+.dash-big .d-item .d-val{font-family:'Noto Serif TC',serif;font-weight:900;font-size:19px;font-variant-numeric:tabular-nums;}
+.section-title{font-family:'Noto Serif TC',serif;font-weight:700;font-size:14.5px;margin:4px 0 10px;}
+.report-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 14px;}
+.report-nav-btn{padding:8px 14px;font-size:15px;}
+.report-nav-btn:disabled{opacity:.35;}
+.report-nav-label{font-family:'Noto Serif TC',serif;font-weight:900;font-size:16px;flex:1;text-align:center;}
+.pie-legend{display:flex;flex-direction:column;gap:6px;margin-top:12px;text-align:left;}
+.pie-legend-row{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;}
+.pie-legend-row .dot{width:10px;height:10px;border-radius:3px;display:inline-block;margin-right:7px;flex-shrink:0;}
+.pie-legend-row .lbl{display:flex;align-items:center;flex:1;color:var(--ink);font-weight:600;}
+.pie-legend-row .amt{font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink-soft);}
+.cust-order-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);}
+.cust-order-row:last-child{border-bottom:none;}
+.cust-order-row .cod{font-size:11.5px;color:var(--ink-soft);}
+.cust-order-row .con{font-size:13px;font-weight:700;}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="hd">
+    <h1>我的收支盈利表</h1>
+    <div class="sub">婕樂纖 JEROSSE · 個人專屬版</div>
+    <div class="tier-row" style="margin-bottom:8px;">
+      <label style="width:56px;">目前等級</label>
+      <select class="tier-select" id="tierSelect"></select>
+    </div>
+    <div class="tier-row">
+      <label style="width:56px;">販售對象</label>
+      <select class="tier-select" id="targetSelect"></select>
+    </div>
+  </div>
+
+  <div class="tabs" style="overflow-x:auto;">
+    <div class="tab active" data-tab="new">開單</div>
+    <div class="tab" data-tab="orders">訂單紀錄</div>
+    <div class="tab" data-tab="stock">庫存</div>
+    <div class="tab" data-tab="dash">總覽</div>
+    <div class="tab" data-tab="report">排行報表</div>
+    <div class="tab" data-tab="split">拆分設定</div>
+  </div>
+
+  <!-- NEW ORDER TAB -->
+  <div class="scrollpane" id="scrollPane">
+  <div class="section" id="tab-new">
+    <div class="cat-tabs" id="catTabs"></div>
+    <div id="productArea"></div>
+  </div>
+
+  <!-- ORDERS TAB -->
+  <div class="section" id="tab-orders" style="display:none;">
+    <div class="section-title">歷史訂單</div>
+    <div id="ordersList"></div>
+  </div>
+
+  <!-- STOCK / INVENTORY TAB -->
+  <div class="section" id="tab-stock" style="display:none;">
+    <div class="section-title">新增進貨紀錄</div>
+    <div class="custom-form">
+      <div class="row"><select id="stkProduct" style="flex:1;"></select></div>
+      <div class="row">
+        <select id="stkSource" onchange="onStockSourceChange()">
+          <option value="線下叫貨">線下叫貨</option>
+          <option value="線上雲倉">線上雲倉</option>
+          <option value="活動贈品轉入">活動贈品轉入（成本$0）</option>
+        </select>
+        <input id="stkQty" type="number" placeholder="數量" min="1">
+      </div>
+      <div class="row">
+        <input id="stkCost" type="number" placeholder="單件成本">
+        <input id="stkDate" type="date">
+      </div>
+      <div class="row"><input id="stkNote" placeholder="備註（例如：活動名稱，選填）"></div>
+      <button class="btn btn-gold btn-full" onclick="addStockEntry()">新增進貨</button>
+    </div>
+    <div class="section-title">庫存總覽（估值 <span id="stockTotalValue" style="color:var(--gold);">$0</span>）</div>
+    <div id="stockSummary"></div>
+    <div class="section-title">進貨歷史</div>
+    <div id="stockHistory"></div>
+  </div>
+
+  <!-- DASHBOARD TAB -->
+  <div class="section" id="tab-dash" style="display:none;">
+    <div class="section-title">全部累積</div>
+    <div class="dash-card">
+      <div class="dash-big">
+        <div class="d-item"><div class="d-lab">總營收</div><div class="d-val" id="dTotalRev" style="color:var(--rose-dark)">$0</div></div>
+        <div class="d-item"><div class="d-lab">總成本</div><div class="d-val" id="dTotalCost" style="color:var(--brick)">$0</div></div>
+        <div class="d-item"><div class="d-lab">總利潤</div><div class="d-val" id="dTotalProfit" style="color:var(--forest)">$0</div></div>
+      </div>
+    </div>
+    <div class="section-title">利潤率</div>
+    <div class="dash-card" id="dMarginCard" style="text-align:center;">
+      <div class="d-val" id="dMargin" style="font-size:28px;color:var(--gold);">—</div>
+    </div>
+    <div class="section-title">本月</div>
+    <div class="dash-card">
+      <div class="dash-big">
+        <div class="d-item"><div class="d-lab">營收</div><div class="d-val" id="mRev" style="color:var(--rose-dark);font-size:15px;">$0</div></div>
+        <div class="d-item"><div class="d-lab">成本</div><div class="d-val" id="mCost" style="color:var(--brick);font-size:15px;">$0</div></div>
+        <div class="d-item"><div class="d-lab">利潤</div><div class="d-val" id="mProfit" style="color:var(--forest);font-size:15px;">$0</div></div>
+      </div>
+    </div>
+    <div class="section-title">贈品/拆分成本占比</div>
+    <div class="dash-card" id="giftShareCard">
+      <div style="font-size:13px;color:var(--ink-soft);">目前累積贈品成本：<b id="giftCostVal" style="color:var(--brick);">$0</b>（佔總成本 <span id="giftSharePct">0%</span>）</div>
+    </div>
+  </div>
+
+  <!-- REPORT / RANKING TAB -->
+  <div class="section" id="tab-report" style="display:none;">
+    <div class="cat-tabs">
+      <div class="cat-tab" id="rp-month" onclick="setReportMode('month')">月報表</div>
+      <div class="cat-tab" id="rp-year" onclick="setReportMode('year')">年報表</div>
+    </div>
+    <div class="report-nav">
+      <button class="btn btn-ghost report-nav-btn" onclick="navReport(-1)">◀</button>
+      <div class="report-nav-label" id="rpTitle">2026年1月</div>
+      <button class="btn btn-ghost report-nav-btn" id="rpNextBtn" onclick="navReport(1)">▶</button>
+    </div>
+    <div class="dash-card">
+      <div class="dash-big">
+        <div class="d-item"><div class="d-lab">營收</div><div class="d-val" id="rpRev" style="color:var(--rose-dark);font-size:16px;">$0</div></div>
+        <div class="d-item"><div class="d-lab">成本</div><div class="d-val" id="rpCost" style="color:var(--brick);font-size:16px;">$0</div></div>
+        <div class="d-item"><div class="d-lab">利潤</div><div class="d-val" id="rpProfit" style="color:var(--forest);font-size:16px;">$0</div></div>
+      </div>
+      <div style="text-align:center;margin-top:10px;font-size:13px;color:var(--ink-soft);">利潤率 <b id="rpMargin" style="color:var(--gold);">—</b></div>
+    </div>
+    <div class="section-title">收支細項</div>
+    <div class="dash-card" id="rpBreakdown"></div>
+    <div class="section-title">銷售對象金額佔比</div>
+    <div class="dash-card" id="rpPieCard" style="text-align:center;"></div>
+    <div class="section-title">商品銷售數量排行</div>
+    <div class="dash-card" id="rpProductRank"></div>
+    <div class="section-title">銷售對象金額排行（點選查看叫貨歷程）</div>
+    <div class="dash-card" id="rpCustomerRank"></div>
+  </div>
+
+  <!-- SPLIT SETTINGS TAB -->
+  <div class="section" id="tab-split" style="display:none;">
+    <div class="section-title">資料備份</div>
+    <div class="custom-form">
+      <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:10px;line-height:1.6;">建議定期匯出備份。就算之後調整程式、換裝置或清過瀏覽器資料，也能把備份檔案匯入回來，資料不會不見。</div>
+      <div class="row">
+        <button class="btn btn-gold" style="flex:1;" onclick="exportData()">匯出備份</button>
+        <button class="btn btn-ghost" style="flex:1;" onclick="triggerImport()">匯入還原</button>
+      </div>
+      <input type="file" id="importFile" accept="application/json" style="display:none;" onchange="handleImportFile(event)">
+    </div>
+    <div class="section-title">新增自訂拆分商品</div>
+    <div class="custom-form">
+      <div class="row"><input id="csName" placeholder="品項名稱，例如：面膜單片"></div>
+      <div class="row">
+        <input id="csBoxCost" type="number" placeholder="整包/整盒成本（元）">
+        <input id="csUnits" type="number" placeholder="可拆成幾份">
+      </div>
+      <button class="btn btn-gold btn-full" onclick="addCustomSplit()">新增</button>
+    </div>
+    <div class="section-title">我的拆分商品</div>
+    <div class="split-list" id="customSplitList"></div>
+  </div>
+  </div>
+
+  <!-- CART BAR -->
+  <div class="cartbar" id="cartBar">
+    <div class="cartbar-inner">
+      <div class="cart-items" id="cartItems"></div>
+      <div class="stat-row">
+        <div class="stat rev"><div class="lab">營收</div><div class="val" id="cRev">$0</div></div>
+        <div class="stat cost"><div class="lab">成本</div><div class="val" id="cCost">$0</div></div>
+        <div class="stat profit"><div class="lab">利潤</div><div class="val" id="cProfit">$0</div></div>
+        <div class="stat margin"><div class="lab">利潤率</div><div class="val" id="cMargin">—</div></div>
+      </div>
+      <div class="cart-note" style="padding:0;border:none;">
+        <label style="font-size:11px;color:var(--ink-soft);display:block;margin-bottom:4px;">販售日期</label>
+        <input type="date" id="cartDate" style="width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:13px;font-family:inherit;">
+      </div>
+      <input class="cart-note" id="cartCustomer" placeholder="銷售對象姓名">
+      <input class="cart-note" id="cartNote" placeholder="備註（選填）">
+      <div class="cart-btns">
+        <button class="btn btn-ghost" style="flex:1;" onclick="clearCart()">清空</button>
+        <button class="btn btn-gold" style="flex:2;" onclick="saveOrder()">儲存訂單</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRODUCT OPTION / GIFT MODAL -->
+  <div class="overlay" id="overlay" onclick="if(event.target===this) closeModal()">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="mName"></h2>
+        <button class="sheet-close" onclick="closeModal()">✕ 關閉</button>
+      </div>
+      <div class="spec" id="mSpec"></div>
+      <div id="mBody"></div>
+      <div id="mFooter"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCJ3VDxH8Vk4zrQEP4O8KS7Z01nVzrN2Vs",
+  authDomain: "jerosse-79f16.firebaseapp.com",
+  databaseURL: "https://jerosse-79f16-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "jerosse-79f16",
+  storageBucket: "jerosse-79f16.firebasestorage.app",
+  messagingSenderId: "1034293304799",
+  appId: "1:1034293304799:web:87f741ba1f4ad3ac02b86a",
+  measurementId: "G-T9YY249BYE"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const DB_ROOT = 'jerosseData';
+// ---------- DATA ----------
+const TIER_ORDER = ['二級輔導督導','三級輔導督導','三級零售加盟商','實習零售加盟商'];
+
+function P(name,spec,cat,costs,retail,split){
+  return {id:name, name, spec, cat, costs, retail: retail||{}, split: split||1};
+}
+
+const PRODUCTS = [
+  // 纖體保健系列
+  P('纖纖飲X','14入/盒','fiber',{'二級輔導督導':880,'三級輔導督導':955,'三級零售加盟商':990,'實習零售加盟商':1160},{single:1480,double:1380,vip:1280}),
+  P('纖飄錠','60錠/盒','fiber',{'二級輔導督導':880,'三級輔導督導':955,'三級零售加盟商':990,'實習零售加盟商':1160},{single:1480,double:1380,vip:1280}),
+  P('雪花紫纖飲','14包/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}),
+  P('爆纖錠','120錠/盒','fiber',{'二級輔導督導':520,'三級輔導督導':560,'三級零售加盟商':580,'實習零售加盟商':660},{single:880,double:800,vip:740}),
+  P('爆纖錠體驗包','30錠/包','fiber',{'二級輔導督導':146,'三級輔導督導':158,'三級零售加盟商':164,'實習零售加盟商':190},{single:240}),
+  P('植萃纖酵宿','60錠/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}),
+  P('植萃纖酵宿體驗包','10錠/包','fiber',{'二級輔導督導':103,'三級輔導督導':113,'三級零售加盟商':117,'實習零售加盟商':145},{single:190}),
+  P('肽纖飲(可可/奶茶)','10入/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}),
+  P('複方金盞花葉黃素EX飲','12入/盒','fiber',{'二級輔導督導':640,'三級輔導督導':695,'三級零售加盟商':720,'實習零售加盟商':840},{single:1080,double:990,vip:900}),
+  P('金盞花葉黃素晶亮凍','10入/盒','fiber',{'二級輔導督導':410,'三級輔導督導':440,'三級零售加盟商':455,'實習零售加盟商':530},{single:680,double:630,vip:600}),
+  P('高機能益生菌','30入/盒','fiber',{'二級輔導督導':770,'三級輔導督導':830,'三級零售加盟商':860,'實習零售加盟商':990},{single:1280,double:1180,vip:1100}),
+  P('9國英雄TURBO極速錠','20錠/包','fiber',{'二級輔導督導':410,'三級輔導督導':440,'三級零售加盟商':455,'實習零售加盟商':530},{single:680,double:630,vip:600}),
+  P('療肺草正冠茶','20入/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}),
+  P('固樂纖','60錠/盒','fiber',{'二級輔導督導':920,'三級輔導督導':1040,'三級零售加盟商':1080,'實習零售加盟商':1260},{single:1680,double:1580,vip:1480}),
+  // 美肌系列
+  P('水光錠','60顆/盒','skin',{'二級輔導督導':920,'三級輔導督導':1040,'三級零售加盟商':1080,'實習零售加盟商':1260},{single:1680,double:1580,vip:1480}),
+  P('水光繃帶面膜(精裝盒)','5片/盒','skin',{'二級輔導督導':450,'三級輔導督導':485,'三級零售加盟商':500,'實習零售加盟商':550},{single:700,double:650,vip:600}, 5),
+  P('水光繃帶面膜(環保箱)','20片/箱','skin',{'二級輔導督導':1600,'三級輔導督導':1740,'三級零售加盟商':1800,'實習零售加盟商':2000},{double:2200}, 20),
+  P('水光繃帶面膜(單片體驗)','1片(30ml)','skin',{'二級輔導督導':20,'三級輔導督導':20,'三級零售加盟商':20,'實習零售加盟商':20},{single:150}),
+  P('雪聚露','120ml/瓶','skin',{'二級輔導督導':770,'三級輔導督導':830,'三級零售加盟商':860,'實習零售加盟商':990},{single:1280,double:1180,vip:1100}),
+  P('婕肌零','200ml/瓶','skin',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}),
+  P('婕肌零體驗包','7ml/包','skin',{'二級輔導督導':20,'三級輔導督導':24,'三級零售加盟商':25,'實習零售加盟商':30},{single:40}),
+  P('Vitalab精純玻尿酸保濕原液','30ml/瓶','skin',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}),
+  P('急救小白瓶','100ml/瓶','skin',{'二級輔導督導':770,'三級輔導督導':830,'三級零售加盟商':860,'實習零售加盟商':990},{single:1280,double:1180,vip:1100}),
+  P('積雪草護手霜','50ml/支','skin',{'二級輔導督導':410,'三級輔導督導':440,'三級零售加盟商':455,'實習零售加盟商':530},{single:680,double:630,vip:600}),
+  P('法樂蓬洗髮露','500ml/瓶','skin',{'二級輔導督導':770,'三級輔導督導':830,'三級零售加盟商':860,'實習零售加盟商':990},{single:1280,double:1180,vip:1100}),
+  P('法樂蓬洗髮露體驗包','8ml/包','skin',{'二級輔導督導':17,'三級輔導督導':20,'三級零售加盟商':21,'實習零售加盟商':24},{single:30}),
+  P('法樂蓬養髮原液','30ml/瓶','skin',{'二級輔導督導':640,'三級輔導督導':695,'三級零售加盟商':720,'實習零售加盟商':840},{single:1080,double:990,vip:900}),
+];
+
+const FIXED_ITEMS = [
+  {name:'宅配運費(客付)', amt:70, type:'rev'},
+  {name:'宅配運費(我付)', amt:-70, type:'cost'},
+  {name:'超商取貨(客付)', amt:60, type:'rev'},
+  {name:'超商取貨(我付)', amt:-60, type:'cost'},
+  {name:'全產品手冊', amt:-12, type:'cost'},
+  {name:'纖體班DM', amt:-12, type:'cost'},
+  {name:'包裝紙袋', amt:-20, type:'cost'},
+  {name:'絲巾環保袋', amt:-120, type:'cost'},
+];
+
+// ---------- STATE ----------
+let state = {
+  tier: '二級輔導督導',
+  target: null,
+  cat: 'fiber',
+  cart: [],
+  orders: [],
+  customSplits: [],
+  stockEntries: [],
+  reportMode: 'month',
+  reportYear: new Date().getFullYear(),
+  reportMonth: new Date().getMonth()
+};
+
+// ---------- STORAGE ----------
+async function loadStorage(){
+  try{
+    const snap = await db.ref(DB_ROOT).once('value');
+    const data = snap.val() || {};
+    if(Array.isArray(data.orders)) state.orders = data.orders;
+    if(Array.isArray(data.customSplits)) state.customSplits = data.customSplits;
+    if(data.tier) state.tier = data.tier;
+    if(data.target) state.target = data.target;
+    if(Array.isArray(data.stockEntries)) state.stockEntries = data.stockEntries;
+  }catch(e){ console.error('Firebase 讀取失敗', e); }
+}
+async function saveOrders(){ try{ await db.ref(DB_ROOT+'/orders').set(state.orders); }catch(e){ console.error(e); } }
+async function saveCustomSplits(){ try{ await db.ref(DB_ROOT+'/customSplits').set(state.customSplits); }catch(e){ console.error(e); } }
+async function saveTier(){ try{ await db.ref(DB_ROOT+'/tier').set(state.tier); }catch(e){} }
+async function saveTarget(){ try{ await db.ref(DB_ROOT+'/target').set(state.target); }catch(e){} }
+async function saveStock(){ try{ await db.ref(DB_ROOT+'/stockEntries').set(state.stockEntries); }catch(e){ console.error(e); } }
+
+// ---------- REALTIME SYNC ----------
+function renderAll(){
+  initTierSelect();
+  initTargetSelect();
+  renderProducts();
+  renderCart();
+  renderOrders();
+  renderStockTab();
+  renderDash();
+  renderReport();
+  renderCustomSplitList();
+}
+function attachRealtimeSync(){
+  let firstFire = true;
+  db.ref(DB_ROOT).on('value', (snap)=>{
+    if(firstFire){ firstFire = false; return; } // skip the initial fire; already loaded via loadStorage()
+    const data = snap.val() || {};
+    state.orders = Array.isArray(data.orders) ? data.orders : [];
+    state.customSplits = Array.isArray(data.customSplits) ? data.customSplits : [];
+    if(data.tier) state.tier = data.tier;
+    if(data.target) state.target = data.target;
+    state.stockEntries = Array.isArray(data.stockEntries) ? data.stockEntries : [];
+    renderAll();
+  });
+}
+
+// ---------- HELPERS ----------
+function fmt(n){ n = Math.round(n); return (n<0?'-$':'$') + Math.abs(n).toLocaleString(); }
+function downlineTiers(){
+  const idx = TIER_ORDER.indexOf(state.tier);
+  return TIER_ORDER.slice(idx+1);
+}
+function myCost(p){ return p.costs[state.tier]; }
+
+// ---------- TIER / TARGET SELECT ----------
+function initTierSelect(){
+  const sel = document.getElementById('tierSelect');
+  sel.innerHTML = TIER_ORDER.map(t=>`<option value="${t}">${t}</option>`).join('');
+  sel.value = state.tier;
+  sel.onchange = ()=>{ state.tier = sel.value; saveTier(); initTargetSelect(); renderProducts(); };
+}
+function targetOptionsList(){
+  return [...downlineTiers().map(t=>({v:t,l:t})),
+    {v:'retail_single',l:'零售價'}, {v:'retail_double',l:'兩盒優惠價'}, {v:'retail_vip',l:'VIP價(滿4000)'}];
+}
+function initTargetSelect(){
+  const opts = targetOptionsList();
+  if(!opts.find(o=>o.v===state.target)) state.target = opts[0].v;
+  const sel = document.getElementById('targetSelect');
+  sel.innerHTML = opts.map(o=>`<option value="${o.v}">${o.l}</option>`).join('');
+  sel.value = state.target;
+  sel.onchange = ()=>{ state.target = sel.value; saveTarget(); renderProducts(); };
+}
+function currentTargetInfo(){
+  const t = state.target;
+  if(TIER_ORDER.includes(t)) return {kind:'downline', label:t};
+  const map = {retail_single:'單盒零售價', retail_double:'兩盒優惠價(每盒)', retail_vip:'滿4000 VIP價(每盒)'};
+  return {kind:'retail', label:map[t]};
+}
+function priceFor(product){
+  const info = currentTargetInfo();
+  if(info.kind==='downline') return product.costs[info.label] ?? null;
+  const keyMap = {'單盒零售價':'single','兩盒優惠價(每盒)':'double','滿4000 VIP價(每盒)':'vip'};
+  const v = product.retail[keyMap[info.label]];
+  return (v===undefined) ? null : v;
+}
+
+// ---------- TABS ----------
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.onclick = ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    ['new','orders','stock','dash','report','split'].forEach(id=>{
+      document.getElementById('tab-'+id).style.display = (id===tab.dataset.tab)?'block':'none';
+    });
+    const isNew = tab.dataset.tab==='new';
+    document.getElementById('cartBar').style.display = isNew ? 'block' : 'none';
+    document.getElementById('scrollPane').scrollTop = 0;
+    if(tab.dataset.tab==='orders') renderOrders();
+    if(tab.dataset.tab==='stock') renderStockTab();
+    if(tab.dataset.tab==='dash') renderDash();
+    if(tab.dataset.tab==='report') renderReport();
+    if(tab.dataset.tab==='split') renderCustomSplitList();
+  };
+});
+
+// ---------- CATEGORY TABS ----------
+const CATS = [{id:'fiber',label:'纖體保健'},{id:'skin',label:'美肌'},{id:'fixed',label:'固定項目'},{id:'gift',label:'贈品/拆分'}];
+function initCatTabs(){
+  const el = document.getElementById('catTabs');
+  el.innerHTML = CATS.map(c=>`<div class="cat-tab ${c.id===state.cat?'active':''}" data-cat="${c.id}">${c.label}</div>`).join('');
+  el.querySelectorAll('.cat-tab').forEach(t=>{
+    t.onclick = ()=>{ state.cat = t.dataset.cat; initCatTabs(); renderProducts(); };
+  });
+}
+
+// ---------- RENDER PRODUCT AREA ----------
+function renderProducts(){
+  const area = document.getElementById('productArea');
+  if(state.cat==='fixed'){
+    area.innerHTML = `<div class="fixed-list">` + FIXED_ITEMS.map((f,i)=>`
+      <div class="fixed-item" onclick="addFixedToCart(${i})">
+        <span class="fname">${f.name}</span>
+        <span class="famt ${f.amt>0?'pos':'neg'}">${f.amt>0?'+':''}${fmt(f.amt)}</span>
+      </div>`).join('') + `</div>
+      <div class="custom-form" style="margin-top:14px;">
+        <h3>自訂支出／額外收入</h3>
+        <div class="row"><input id="cxName" placeholder="項目名稱"></div>
+        <div class="row">
+          <select id="cxType"><option value="cost">支出（成本）</option><option value="rev">收入</option></select>
+          <input id="cxAmt" type="number" placeholder="金額">
+        </div>
+        <button class="btn btn-gold btn-full" onclick="addCustomExpense()">加入清單</button>
+      </div>`;
+    return;
+  }
+  if(state.cat==='gift'){
+    const built = PRODUCTS.filter(p=>p.split>1 || true); // allow gifting any product
+    area.innerHTML = `<div class="section-title" style="margin-top:0;">從商品清單挑選贈品</div><div class="grid">` +
+      built.map(p=>`
+      <div class="pcard" onclick="openGiftModal('${p.id}')">
+        <div class="pname">${p.name}</div>
+        <div class="pspec">${p.spec}</div>
+        <div class="pcost">整份成本 <b>${fmt(myCost(p))}</b></div>
+      </div>`).join('') + `</div>` +
+      (state.customSplits.length ? `<div class="section-title">我的自訂拆分商品</div><div class="grid">` +
+        state.customSplits.map((c,i)=>`
+        <div class="pcard" onclick="openCustomSplitGift(${i})">
+          <div class="pname">${c.name}</div>
+          <div class="pspec">每份成本 ${fmt(c.boxCost/c.units)}</div>
+          <div class="pcost">整包成本 <b>${fmt(c.boxCost)}</b></div>
+        </div>`).join('') + `</div>` : '');
+    return;
+  }
+  const list = PRODUCTS.filter(p=>p.cat===state.cat);
+  const info = currentTargetInfo();
+  area.innerHTML = `<div class="section-title" style="margin-top:0;">販售對象：${info.label}（點選商品直接加入）</div><div class="grid">` + list.map(p=>{
+    const cost = myCost(p);
+    const price = priceFor(p);
+    const unavailable = price===null;
+    return `<div class="pcard" style="${unavailable?'opacity:.45;cursor:default;':''}" onclick="${unavailable?'':`addDirect('${p.id}')`}">
+      <div class="pname">${p.name}</div>
+      <div class="pspec">${p.spec}</div>
+      <div class="pcost">我的成本 <b>${fmt(cost)}</b></div>
+      <div class="pcost" style="margin-top:2px;">${unavailable? '此對象無此價格' : '售價 <b style="color:var(--rose-dark)">'+fmt(price)+'</b>'}</div>
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+// ---------- DIRECT ADD (fiber/skin) ----------
+function addDirect(id){
+  const p = PRODUCTS.find(x=>x.id===id);
+  const info = currentTargetInfo();
+  const price = priceFor(p);
+  if(price===null){ alert('此商品沒有「'+info.label+'」的價格'); return; }
+  const cost = myCost(p);
+  const idx = state.cart.findIndex(it=>it.pid===id && it.label===info.label);
+  if(idx>-1){ state.cart[idx].qty++; }
+  else { state.cart.push({pid:id, name:p.name+'（'+info.label+'）', qty:1, unitRev:price, unitCost:cost, kind:info.kind, label:info.label}); }
+  renderCart();
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
+
+// ---------- GIFT MODAL ----------
+function openGiftModal(id){
+  const p = PRODUCTS.find(x=>x.id===id);
+  document.getElementById('mName').textContent = p.name + '（贈品）';
+  document.getElementById('mSpec').textContent = p.spec;
+  let html = `<div class="opt-group"><div class="opt-label">整份贈送</div>
+    <div class="split-row">
+      <span style="flex:1;">整份，成本 ${fmt(myCost(p))}／份</span>
+      <input type="number" id="giftQtyFull" value="1" min="1">
+      <button class="btn btn-gold" onclick="addGiftToCart('${p.id}',false)">加入</button>
+    </div></div>`;
+  if(p.split>1){
+    html += `<div class="opt-group"><div class="opt-label">拆份贈送（本商品每 ${p.split} 份/包，單份成本 ${fmt(myCost(p)/p.split)}）</div>
+      <div class="split-row">
+        <span style="flex:1;">拆出份數</span>
+        <input type="number" id="giftQtySplit" value="1" min="1">
+        <button class="btn btn-gold" onclick="addGiftToCart('${p.id}',true)">加入</button>
+      </div></div>`;
+  }
+  document.getElementById('mBody').innerHTML = html;
+  document.getElementById('overlay').classList.add('show');
+}
+function addGiftToCart(id, isSplit){
+  const p = PRODUCTS.find(x=>x.id===id);
+  const qty = Number(document.getElementById(isSplit?'giftQtySplit':'giftQtyFull').value) || 1;
+  const unitCost = isSplit ? myCost(p)/p.split : myCost(p);
+  state.cart.push({
+    pid: p.id,
+    name: p.name + (isSplit? '（贈品-拆份）':'（贈品-整份）'),
+    qty, unitRev: 0, unitCost, kind:'gift'
+  });
+  closeModal();
+  renderCart();
+}
+function openCustomSplitGift(i){
+  const c = state.customSplits[i];
+  document.getElementById('mName').textContent = c.name + '（贈品）';
+  document.getElementById('mSpec').textContent = '整包成本 ' + fmt(c.boxCost) + '，可拆 ' + c.units + ' 份';
+  document.getElementById('mBody').innerHTML = `
+    <div class="opt-group"><div class="opt-label">拆份贈送（單份成本 ${fmt(c.boxCost/c.units)}）</div>
+      <div class="split-row">
+        <span style="flex:1;">拆出份數</span>
+        <input type="number" id="csGiftQty" value="1" min="1">
+        <button class="btn btn-gold" onclick="addCustomSplitGiftToCart(${i})">加入</button>
+      </div></div>`;
+  document.getElementById('overlay').classList.add('show');
+}
+function addCustomSplitGiftToCart(i){
+  const c = state.customSplits[i];
+  const qty = Number(document.getElementById('csGiftQty').value) || 1;
+  state.cart.push({ pid:'cs:'+c.name, name: c.name + '（贈品-拆份）', qty, unitRev:0, unitCost: c.boxCost/c.units, kind:'gift' });
+  closeModal();
+  renderCart();
+}
+
+// ---------- FIXED / CUSTOM EXPENSE ----------
+function addFixedToCart(i){
+  const f = FIXED_ITEMS[i];
+  state.cart.push({
+    name: f.name, qty:1,
+    unitRev: f.type==='rev'? f.amt : 0,
+    unitCost: f.type==='cost'? -f.amt : 0,
+    kind:'fixed'
+  });
+  renderCart();
+}
+function addCustomExpense(){
+  const name = document.getElementById('cxName').value.trim();
+  const type = document.getElementById('cxType').value;
+  const amt = Number(document.getElementById('cxAmt').value);
+  if(!name || !amt){ return; }
+  state.cart.push({
+    name: name + (type==='cost'?'（自訂支出）':'（自訂收入）'),
+    qty:1,
+    unitRev: type==='rev'? amt : 0,
+    unitCost: type==='cost'? amt : 0,
+    kind:'custom'
+  });
+  document.getElementById('cxName').value=''; document.getElementById('cxAmt').value='';
+  renderCart();
+}
+
+// ---------- CART ----------
+function cartTotals(){
+  let rev=0, cost=0;
+  state.cart.forEach(it=>{ rev += it.unitRev*it.qty; cost += it.unitCost*it.qty; });
+  return {rev, cost, profit: rev-cost, margin: rev? ((rev-cost)/rev*100):0};
+}
+function renderCart(){
+  const wrap = document.getElementById('cartItems');
+  if(!state.cart.length){ wrap.innerHTML = `<div class="empty" style="padding:14px;">尚未加入任何項目</div>`; }
+  else {
+    wrap.innerHTML = state.cart.map((it,i)=>{
+      const rev = it.unitRev*it.qty, cost = it.unitCost*it.qty, profit = rev-cost;
+      const total = rev || cost || 1;
+      const costPct = Math.min(100, Math.max(0,(cost/total)*100));
+      const profitPct = 100-costPct;
+      return `<div class="line">
+        <div class="line-top">
+          <div style="flex:1;"><div class="line-name">${it.name}</div><div class="line-meta">數量 
+            <input type="number" value="${it.qty}" min="1" style="width:44px;border:1px solid var(--line);border-radius:6px;text-align:center;" onchange="updateQty(${i},this.value)">
+            ${it.kind==='downline'||it.kind==='retail' ? `　單價 <input type="number" value="${it.unitRev}" style="width:64px;border:1px solid var(--line);border-radius:6px;text-align:center;" onchange="updatePrice(${i},this.value)">` : ''}
+          </div></div>
+          <button class="line-del" onclick="removeLine(${i})">✕</button>
+        </div>
+        ${ (rev>0 && cost>0) ? `<div class="spreadbar"><div class="seg-cost" style="width:${costPct}%"></div><div class="seg-profit" style="width:${profitPct}%"></div></div>` : ''}
+        <div class="line-nums"><span>營收 <b>${fmt(rev)}</b></span><span>成本 <b>${fmt(cost)}</b></span><span>利潤 <b>${fmt(profit)}</b></span></div>
+      </div>`;
+    }).join('');
+  }
+  const t = cartTotals();
+  document.getElementById('cRev').textContent = fmt(t.rev);
+  document.getElementById('cCost').textContent = fmt(t.cost);
+  document.getElementById('cProfit').textContent = fmt(t.profit);
+  document.getElementById('cMargin').textContent = t.rev? t.margin.toFixed(1)+'%' : '—';
+}
+function updateQty(i,val){ state.cart[i].qty = Math.max(1, Number(val)||1); renderCart(); }
+function updatePrice(i,val){ state.cart[i].unitRev = Number(val)||0; renderCart(); }
+function removeLine(i){ state.cart.splice(i,1); renderCart(); }
+function todayStr(){
+  const d = new Date();
+  const pad = n=> String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+}
+function clearCart(){
+  state.cart=[];
+  document.getElementById('cartCustomer').value='';
+  document.getElementById('cartNote').value='';
+  document.getElementById('cartDate').value = todayStr();
+  renderCart();
+}
+
+async function saveOrder(){
+  if(!state.cart.length) return;
+  const t = cartTotals();
+  const dateVal = document.getElementById('cartDate').value || todayStr();
+  const [y,m,d] = dateVal.split('-').map(Number);
+  const now = new Date();
+  const saleDate = new Date(y, m-1, d, now.getHours(), now.getMinutes(), now.getSeconds());
+  const order = {
+    id: Date.now(),
+    customer: document.getElementById('cartCustomer').value.trim() || '未填寫',
+    note: document.getElementById('cartNote').value.trim(),
+    date: saleDate.toISOString(),
+    tier: state.tier,
+    items: JSON.parse(JSON.stringify(state.cart)),
+    rev: t.rev, cost: t.cost, profit: t.profit
+  };
+  state.orders.unshift(order);
+  await saveOrders();
+  clearCart();
+  alert('訂單已儲存！');
+}
+
+// ---------- ORDERS TAB ----------
+function renderOrders(){
+  const el = document.getElementById('ordersList');
+  if(!state.orders.length){ el.innerHTML = `<div class="empty">還沒有儲存的訂單</div>`; return; }
+  el.innerHTML = state.orders.map((o,i)=>{
+    const d = new Date(o.date);
+    const dstr = d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate();
+    return `<div class="order-card">
+      <div class="order-head" onclick="toggleOrder(${i})">
+        <div><div class="oname">${o.customer}</div><div class="odate">${dstr} · ${o.tier}${o.note? ' · '+o.note : ''}</div></div>
+        <div style="font-weight:900;color:var(--forest);">${fmt(o.profit)}</div>
+      </div>
+      <div class="order-stats">
+        <span>營收 <b>${fmt(o.rev)}</b></span><span>成本 <b>${fmt(o.cost)}</b></span>
+      </div>
+      <div class="order-detail" id="odetail-${i}">
+        ${o.items.map(it=>`<div class="line-nums" style="margin-top:4px;"><span>${it.name} ×${it.qty}</span><b>${fmt((it.unitRev-it.unitCost)*it.qty)}</b></div>`).join('')}
+        <button class="btn btn-ghost order-del" onclick="deleteOrder(${i})">刪除此訂單</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleOrder(i){ document.getElementById('odetail-'+i).classList.toggle('show'); }
+async function deleteOrder(i){
+  if(!confirm('確定刪除這筆訂單？')) return;
+  state.orders.splice(i,1);
+  await saveOrders();
+  renderOrders();
+}
+
+// ---------- DASHBOARD ----------
+function renderDash(){
+  let rev=0, cost=0, giftCost=0;
+  let mRev=0, mCost=0, mProfit=0;
+  const now = new Date();
+  state.orders.forEach(o=>{
+    rev += o.rev; cost += o.cost;
+    o.items.forEach(it=>{ if(it.kind==='gift') giftCost += it.unitCost*it.qty; });
+    const d = new Date(o.date);
+    if(d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth()){
+      mRev += o.rev; mCost += o.cost; mProfit += o.profit;
+    }
+  });
+  const profit = rev-cost;
+  document.getElementById('dTotalRev').textContent = fmt(rev);
+  document.getElementById('dTotalCost').textContent = fmt(cost);
+  document.getElementById('dTotalProfit').textContent = fmt(profit);
+  document.getElementById('dMargin').textContent = rev? (profit/rev*100).toFixed(1)+'%' : '—';
+  document.getElementById('mRev').textContent = fmt(mRev);
+  document.getElementById('mCost').textContent = fmt(mCost);
+  document.getElementById('mProfit').textContent = fmt(mProfit);
+  document.getElementById('giftCostVal').textContent = fmt(giftCost);
+  document.getElementById('giftSharePct').textContent = cost? (giftCost/cost*100).toFixed(1)+'%' : '0%';
+}
+
+const PIE_COLORS = ['#C15C7C','#B8863E','#3F6E52','#6B5E70','#9E4763','#4C7A63','#8C6239','#5A4B6B','#A6483F','#2F5233','#7A5C8C','#C98A3E'];
+function renderPieSVG(data){
+  // data: [{label, value}]
+  const total = data.reduce((s,d)=>s+d.value,0);
+  const size=150, r=55, cx=size/2, cy=size/2, circ=2*Math.PI*r;
+  if(total<=0){
+    return `<div class="empty" style="padding:10px;">此期間尚無資料</div>`;
+  }
+  let acc=0;
+  const circles = data.map((d,i)=>{
+    const frac = d.value/total;
+    const len = frac*circ;
+    const dash = `${len} ${circ-len}`;
+    const offset = -acc*circ;
+    acc += frac;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${PIE_COLORS[i%PIE_COLORS.length]}" stroke-width="26" stroke-dasharray="${dash}" stroke-dashoffset="${offset}"></circle>`;
+  }).join('');
+  const legend = data.map((d,i)=>{
+    const pct = (d.value/total*100).toFixed(1);
+    return `<div class="pie-legend-row"><span class="lbl"><span class="dot" style="background:${PIE_COLORS[i%PIE_COLORS.length]}"></span>${d.label}</span><span class="amt">${fmt(d.value)}（${pct}%）</span></div>`;
+  }).join('');
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform:rotate(-90deg);">${circles}</svg><div class="pie-legend">${legend}</div>`;
+}
+
+// ---------- REPORT / RANKING ----------
+function isFuturePeriod(year, month, mode){
+  const now = new Date();
+  if(mode==='year') return year >= now.getFullYear() + 1 || year > now.getFullYear();
+  if(year > now.getFullYear()) return true;
+  if(year === now.getFullYear() && month > now.getMonth()) return true;
+  return false;
+}
+function setReportMode(mode){
+  state.reportMode = mode;
+  const now = new Date();
+  state.reportYear = now.getFullYear();
+  state.reportMonth = now.getMonth();
+  renderReport();
+}
+function navReport(delta){
+  if(state.reportMode==='month'){
+    let m = state.reportMonth + delta;
+    let y = state.reportYear;
+    if(m<0){ m=11; y--; } else if(m>11){ m=0; y++; }
+    if(isFuturePeriod(y,m,'month')) return;
+    state.reportMonth = m; state.reportYear = y;
+  } else {
+    const y = state.reportYear + delta;
+    if(isFuturePeriod(y,0,'year')) return;
+    state.reportYear = y;
+  }
+  renderReport();
+}
+const KIND_LABEL = {downline:'賣給下線', retail:'零售給消費者', gift:'贈品成本', fixed:'固定項目', custom:'自訂項目'};
+function renderReport(){
+  document.getElementById('rp-month').classList.toggle('active', state.reportMode==='month');
+  document.getElementById('rp-year').classList.toggle('active', state.reportMode==='year');
+  document.getElementById('rpTitle').textContent = state.reportMode==='month'
+    ? `${state.reportYear}年${state.reportMonth+1}月` : `${state.reportYear}年`;
+  let nextDisabled;
+  if(state.reportMode==='month'){
+    let nm = state.reportMonth+1, ny = state.reportYear;
+    if(nm>11){ nm=0; ny++; }
+    nextDisabled = isFuturePeriod(ny, nm, 'month');
+  } else {
+    nextDisabled = isFuturePeriod(state.reportYear+1, 0, 'year');
+  }
+  document.getElementById('rpNextBtn').disabled = nextDisabled;
+
+  let rev=0, cost=0;
+  const byKind = {};
+  const productQty = {};
+  const customerRev = {};
+
+  state.orders.forEach(o=>{
+    const d = new Date(o.date);
+    const match = state.reportMode==='month'
+      ? (d.getFullYear()===state.reportYear && d.getMonth()===state.reportMonth)
+      : (d.getFullYear()===state.reportYear);
+    if(!match) return;
+    rev += o.rev; cost += o.cost;
+    const cust = o.customer || '未填寫';
+    customerRev[cust] = (customerRev[cust]||0) + o.rev;
+    o.items.forEach(it=>{
+      const k = it.kind || 'custom';
+      if(!byKind[k]) byKind[k] = {rev:0, cost:0};
+      byKind[k].rev += it.unitRev*it.qty;
+      byKind[k].cost += it.unitCost*it.qty;
+      if(k==='downline' || k==='retail'){
+        productQty[it.name] = (productQty[it.name]||0) + it.qty;
+      }
+    });
+  });
+  const profit = rev-cost;
+  document.getElementById('rpRev').textContent = fmt(rev);
+  document.getElementById('rpCost').textContent = fmt(cost);
+  document.getElementById('rpProfit').textContent = fmt(profit);
+  document.getElementById('rpMargin').textContent = rev? (profit/rev*100).toFixed(1)+'%' : '—';
+
+  const bkEl = document.getElementById('rpBreakdown');
+  const kinds = Object.keys(byKind);
+  bkEl.innerHTML = kinds.length ? kinds.map(k=>`
+    <div class="line-nums" style="margin-bottom:6px;"><span>${KIND_LABEL[k]||k}</span><span>營收 <b>${fmt(byKind[k].rev)}</b> ／ 成本 <b>${fmt(byKind[k].cost)}</b></span></div>
+  `).join('') : `<div class="empty" style="padding:6px;">此期間尚無資料</div>`;
+
+  const prEl = document.getElementById('rpProductRank');
+  const prSorted = Object.entries(productQty).sort((a,b)=>b[1]-a[1]);
+  prEl.innerHTML = prSorted.length ? prSorted.map(([name,qty],i)=>`
+    <div class="line-nums" style="margin-bottom:6px;"><span>${i+1}. ${name}</span><b>${qty} 份</b></div>
+  `).join('') : `<div class="empty" style="padding:6px;">此期間尚無銷售</div>`;
+
+  const crEl = document.getElementById('rpCustomerRank');
+  const crSorted = Object.entries(customerRev).sort((a,b)=>b[1]-a[1]);
+  state.reportCustomerNames = crSorted.map(e=>e[0]);
+  crEl.innerHTML = crSorted.length ? crSorted.map(([name,amt],i)=>`
+    <div class="line-nums" style="margin-bottom:6px;cursor:pointer;" onclick="openCustomerDetail(${i})"><span>${i+1}. ${name} ›</span><b>${fmt(amt)}</b></div>
+  `).join('') : `<div class="empty" style="padding:6px;">此期間尚無訂單</div>`;
+
+  // pie chart: top 5 customers by revenue this period + 其他
+  const pieEl = document.getElementById('rpPieCard');
+  const top = crSorted.slice(0,5).map(([label,value])=>({label,value}));
+  const restSum = crSorted.slice(5).reduce((s,e)=>s+e[1],0);
+  if(restSum>0) top.push({label:'其他', value:restSum});
+  pieEl.innerHTML = renderPieSVG(top);
+}
+
+// ---------- CUSTOMER DETAIL ----------
+function openCustomerDetail(idx){
+  const name = state.reportCustomerNames[idx];
+  const orders = state.orders.filter(o=>(o.customer||'未填寫')===name)
+    .sort((a,b)=> new Date(b.date)-new Date(a.date));
+  const totalRev = orders.reduce((s,o)=>s+o.rev,0);
+  const totalCost = orders.reduce((s,o)=>s+o.cost,0);
+  const totalProfit = totalRev-totalCost;
+  document.getElementById('mName').textContent = name;
+  document.getElementById('mSpec').textContent = `共 ${orders.length} 筆叫貨 · 累積營收 ${fmt(totalRev)} · 累積利潤 ${fmt(totalProfit)}`;
+  document.getElementById('mBody').innerHTML = orders.length ? orders.map(o=>{
+    const d = new Date(o.date);
+    const dstr = d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate();
+    const itemNames = o.items.map(it=>it.name+'×'+it.qty).join('、');
+    return `<div class="cust-order-row">
+      <div><div class="con">${dstr}</div><div class="cod">${itemNames}${o.note? ' · '+o.note:''}</div></div>
+      <div style="text-align:right;"><div class="con" style="color:var(--forest);">${fmt(o.profit)}</div><div class="cod">營收 ${fmt(o.rev)}</div></div>
+    </div>`;
+  }).join('') : `<div class="empty">尚無叫貨紀錄</div>`;
+  document.getElementById('mFooter').innerHTML = '';
+  document.getElementById('overlay').classList.add('show');
+}
+
+// ---------- BACKUP / RESTORE ----------
+function exportData(){
+  const payload = {
+    orders: state.orders,
+    customSplits: state.customSplits,
+    tier: state.tier,
+    target: state.target,
+    stockEntries: state.stockEntries,
+    exportedAt: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '婕樂纖收支備份_' + todayStr() + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function triggerImport(){ document.getElementById('importFile').click(); }
+async function handleImportFile(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    if(!confirm('匯入將會覆蓋目前手機/裝置上的資料，確定要匯入嗎？')){ e.target.value=''; return; }
+    if(Array.isArray(payload.orders)) state.orders = payload.orders;
+    if(Array.isArray(payload.customSplits)) state.customSplits = payload.customSplits;
+    if(payload.tier) state.tier = payload.tier;
+    if(payload.target) state.target = payload.target;
+    if(Array.isArray(payload.stockEntries)) state.stockEntries = payload.stockEntries;
+    await saveOrders();
+    await saveCustomSplits();
+    await saveTier();
+    await saveTarget();
+    await saveStock();
+    initTierSelect();
+    initTargetSelect();
+    renderProducts();
+    renderCart();
+    renderCustomSplitList();
+    alert('匯入完成！');
+  }catch(err){
+    alert('檔案格式不正確，匯入失敗');
+  }
+  e.target.value = '';
+}
+
+// ---------- INVENTORY / STOCK ----------
+function allInventoryItems(){
+  return [
+    ...PRODUCTS.map(p=>({id:p.id, name:p.name, spec:p.spec})),
+    ...state.customSplits.map(c=>({id:'cs:'+c.name, name:c.name, spec:'自訂拆分商品'}))
+  ];
+}
+function defaultUnitCostForStock(pid, source){
+  if(source==='活動贈品轉入') return 0;
+  if(pid.startsWith('cs:')){
+    const name = pid.slice(3);
+    const c = state.customSplits.find(x=>x.name===name);
+    return c ? (c.boxCost/c.units) : 0;
+  }
+  const p = PRODUCTS.find(x=>x.id===pid);
+  return p ? myCost(p) : 0;
+}
+function initStockProductSelect(){
+  const sel = document.getElementById('stkProduct');
+  const items = allInventoryItems();
+  sel.innerHTML = items.map(it=>`<option value="${it.id}">${it.name}（${it.spec}）</option>`).join('');
+  onStockSourceChange();
+}
+function onStockSourceChange(){
+  const pid = document.getElementById('stkProduct').value;
+  const source = document.getElementById('stkSource').value;
+  const costInput = document.getElementById('stkCost');
+  costInput.value = defaultUnitCostForStock(pid, source);
+  costInput.disabled = (source==='活動贈品轉入');
+}
+document.addEventListener('change', (e)=>{
+  if(e.target && e.target.id==='stkProduct') onStockSourceChange();
+});
+async function addStockEntry(){
+  const pid = document.getElementById('stkProduct').value;
+  const item = allInventoryItems().find(x=>x.id===pid);
+  if(!item){ alert('請先在拆分設定新增至少一個商品，或選擇既有商品'); return; }
+  const source = document.getElementById('stkSource').value;
+  const qty = Number(document.getElementById('stkQty').value) || 0;
+  if(qty<=0){ alert('請輸入進貨數量'); return; }
+  const unitCost = source==='活動贈品轉入' ? 0 : (Number(document.getElementById('stkCost').value)||0);
+  const dateVal = document.getElementById('stkDate').value || todayStr();
+  const note = document.getElementById('stkNote').value.trim();
+  state.stockEntries.unshift({ id:Date.now(), pid, name:item.name, source, qty, unitCost, date:dateVal, note });
+  await saveStock();
+  document.getElementById('stkQty').value='';
+  document.getElementById('stkNote').value='';
+  renderStockTab();
+}
+async function deleteStockEntry(i){
+  if(!confirm('確定刪除這筆進貨紀錄？')) return;
+  state.stockEntries.splice(i,1);
+  await saveStock();
+  renderStockTab();
+}
+function renderStockTab(){
+  initStockProductSelect();
+  if(!document.getElementById('stkDate').value) document.getElementById('stkDate').value = todayStr();
+
+  const byPid = {};
+  state.stockEntries.forEach(e=>{
+    if(!byPid[e.pid]) byPid[e.pid] = {name:e.name, qty:0, costValue:0, offline:0, online:0, promo:0};
+    byPid[e.pid].qty += e.qty;
+    byPid[e.pid].costValue += e.qty*e.unitCost;
+    if(e.source==='線下叫貨') byPid[e.pid].offline += e.qty;
+    else if(e.source==='線上雲倉') byPid[e.pid].online += e.qty;
+    else byPid[e.pid].promo += e.qty;
+  });
+  const soldMap = {};
+  state.orders.forEach(o=>o.items.forEach(it=>{
+    if(it.pid && (it.kind==='downline'||it.kind==='retail'||it.kind==='gift')){
+      soldMap[it.pid] = (soldMap[it.pid]||0) + it.qty;
+    }
+  }));
+  const rows = Object.keys(byPid).map(pid=>{
+    const b = byPid[pid];
+    const sold = soldMap[pid]||0;
+    const remain = b.qty - sold;
+    const avgCost = b.qty>0 ? b.costValue/b.qty : 0;
+    return {name:b.name, inQty:b.qty, sold, remain, value:remain*avgCost, avgCost, b};
+  }).sort((a,b)=>b.remain-a.remain);
+
+  const totalValue = rows.reduce((s,r)=>s+Math.max(r.value,0),0);
+  document.getElementById('stockTotalValue').textContent = fmt(totalValue);
+
+  const el = document.getElementById('stockSummary');
+  el.innerHTML = rows.length ? rows.map(r=>`
+    <div class="line">
+      <div class="line-top"><div class="line-name">${r.name}</div><div style="font-weight:900;color:${r.remain<0?'var(--brick)':'var(--forest)'};">庫存 ${r.remain}</div></div>
+      <div class="line-meta">進貨 ${r.inQty}（線下 ${r.b.offline}／線上 ${r.b.online}／活動贈品 ${r.b.promo}） · 已出貨 ${r.sold}</div>
+      <div class="line-nums"><span>平均成本 <b>${fmt(r.avgCost)}</b></span><span>庫存估值 <b>${fmt(r.value)}</b></span></div>
+    </div>
+  `).join('') : `<div class="empty">尚無進貨紀錄</div>`;
+
+  const hEl = document.getElementById('stockHistory');
+  hEl.innerHTML = state.stockEntries.length ? state.stockEntries.map((e,i)=>`
+    <div class="fixed-item" style="align-items:flex-start;">
+      <div><div class="fname">${e.name}（${e.source}）</div><div class="line-meta">${e.date} · 數量 ${e.qty} · 單件成本 ${fmt(e.unitCost)}${e.note? ' · '+e.note:''}</div></div>
+      <button class="line-del" onclick="deleteStockEntry(${i})">✕</button>
+    </div>
+  `).join('') : `<div class="empty">尚無進貨紀錄</div>`;
+}
+
+// ---------- CUSTOM SPLIT ITEMS ----------
+async function addCustomSplit(){
+  const name = document.getElementById('csName').value.trim();
+  const boxCost = Number(document.getElementById('csBoxCost').value);
+  const units = Number(document.getElementById('csUnits').value);
+  if(!name || !boxCost || !units){ alert('請完整填寫品項名稱、整包成本與可拆份數'); return; }
+  state.customSplits.push({name, boxCost, units});
+  await saveCustomSplits();
+  document.getElementById('csName').value='';
+  document.getElementById('csBoxCost').value='';
+  document.getElementById('csUnits').value='';
+  renderCustomSplitList();
+}
+function renderCustomSplitList(){
+  const el = document.getElementById('customSplitList');
+  if(!state.customSplits.length){ el.innerHTML = `<div class="empty">尚未新增拆分商品</div>`; return; }
+  el.innerHTML = state.customSplits.map((c,i)=>`
+    <div class="fixed-item">
+      <div><div class="fname">${c.name}</div><div class="line-meta">整包 ${fmt(c.boxCost)} ÷ ${c.units}份 = 單份 ${fmt(c.boxCost/c.units)}</div></div>
+      <button class="line-del" onclick="removeCustomSplit(${i})">✕</button>
+    </div>`).join('');
+}
+async function removeCustomSplit(i){
+  state.customSplits.splice(i,1);
+  await saveCustomSplits();
+  renderCustomSplitList();
+}
+
+// ---------- INIT ----------
+(async function init(){
+  await loadStorage();
+  initTierSelect();
+  initTargetSelect();
+  initCatTabs();
+  renderProducts();
+  renderCart();
+  document.getElementById('cartDate').value = todayStr();
+  document.getElementById('stkDate').value = todayStr();
+  attachRealtimeSync();
+})();
+</script>
+</body>
+</html>
