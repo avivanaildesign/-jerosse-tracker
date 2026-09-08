@@ -51,6 +51,12 @@ body{background:var(--paper);color:var(--ink);font-family:'Noto Sans TC',sans-se
 .pcard .pspec{font-size:11px;color:var(--ink-soft);margin-bottom:8px;}
 .pcard .pcost{font-size:11px;color:var(--ink-soft);}
 .pcard .pcost b{color:var(--brick);font-variant-numeric:tabular-nums;font-size:14px;}
+.stock-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 12px 10px;cursor:pointer;transition:.15s;}
+.stock-card:active{transform:scale(.97);}
+.stock-card .pname{font-weight:700;font-size:13.5px;line-height:1.3;margin-bottom:2px;}
+.stock-card .pspec{font-size:11px;color:var(--ink-soft);margin-bottom:8px;}
+.stock-card .stock-num{font-size:26px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:4px;}
+.stock-card .stock-sub{font-size:10.5px;color:var(--ink-soft);line-height:1.5;}
 
 .fixed-list,.split-list{display:flex;flex-direction:column;gap:8px;}
 .fixed-item{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 14px;cursor:pointer;}
@@ -193,26 +199,13 @@ body{background:var(--paper);color:var(--ink);font-family:'Noto Sans TC',sans-se
 
   <!-- STOCK / INVENTORY TAB -->
   <div class="section" id="tab-stock" style="display:none;">
-    <div class="section-title">新增進貨紀錄</div>
-    <div class="custom-form">
-      <div class="row"><select id="stkProduct" style="flex:1;"></select></div>
-      <div class="row">
-        <select id="stkSource" onchange="onStockSourceChange()">
-          <option value="線下叫貨">線下叫貨</option>
-          <option value="線上雲倉">線上雲倉</option>
-          <option value="活動贈品轉入">活動贈品轉入（成本$0）</option>
-        </select>
-        <input id="stkQty" type="number" placeholder="數量" min="1">
-      </div>
-      <div class="row">
-        <input id="stkCost" type="number" placeholder="單件成本">
-        <input id="stkDate" type="date">
-      </div>
-      <div class="row"><input id="stkNote" placeholder="備註（例如：活動名稱，選填）"></div>
-      <button class="btn btn-gold btn-full" onclick="addStockEntry()">新增進貨</button>
+    <div class="section-title">庫存商品（點選卡片新增進貨）</div>
+    <div class="dash-card" style="text-align:center;margin-bottom:14px;">
+      <div class="d-lab">庫存總估值</div>
+      <div class="d-val" id="stockTotalValue" style="font-size:24px;color:var(--gold);">$0</div>
     </div>
-    <div class="section-title">庫存總覽（估值 <span id="stockTotalValue" style="color:var(--gold);">$0</span>）</div>
-    <div id="stockSummary"></div>
+    <div class="cat-tabs" id="stockCatTabs"></div>
+    <div id="stockGrid"></div>
     <div class="section-title">進貨歷史</div>
     <div id="stockHistory"></div>
   </div>
@@ -413,6 +406,7 @@ let state = {
   orders: [],
   customSplits: [],
   stockEntries: [],
+  stockCat: 'fiber',
   reportMode: 'month',
   reportYear: new Date().getFullYear(),
   reportMonth: new Date().getMonth()
@@ -523,7 +517,7 @@ document.querySelectorAll('.tab').forEach(tab=>{
 });
 
 // ---------- CATEGORY TABS ----------
-const CATS = [{id:'fiber',label:'纖體保健'},{id:'skin',label:'美肌'},{id:'fixed',label:'固定項目'},{id:'gift',label:'贈品/拆分'}];
+const CATS = [{id:'fiber',label:'纖體保健'},{id:'skin',label:'美肌'},{id:'fixed',label:'固定項目'},{id:'gift',label:'贈品/拆分'},{id:'self',label:'自用'}];
 function initCatTabs(){
   const el = document.getElementById('catTabs');
   el.innerHTML = CATS.map(c=>`<div class="cat-tab ${c.id===state.cat?'active':''}" data-cat="${c.id}">${c.label}</div>`).join('');
@@ -552,18 +546,20 @@ function renderProducts(){
       </div>`;
     return;
   }
-  if(state.cat==='gift'){
-    const built = PRODUCTS.filter(p=>p.split>1 || true); // allow gifting any product
-    area.innerHTML = `<div class="section-title" style="margin-top:0;">從商品清單挑選贈品</div><div class="grid">` +
+  if(state.cat==='gift' || state.cat==='self'){
+    const mode = state.cat;
+    const label = mode==='self' ? '自用' : '贈品';
+    const built = PRODUCTS.filter(p=>p.split>1 || true); // allow gifting/self-use of any product
+    area.innerHTML = `<div class="section-title" style="margin-top:0;">從商品清單挑選${label}</div><div class="grid">` +
       built.map(p=>`
-      <div class="pcard" onclick="openGiftModal('${p.id}')">
+      <div class="pcard" onclick="openGiftModal('${p.id}','${mode}')">
         <div class="pname">${p.name}</div>
         <div class="pspec">${p.spec}</div>
         <div class="pcost">整份成本 <b>${fmt(myCost(p))}</b></div>
       </div>`).join('') + `</div>` +
       (state.customSplits.length ? `<div class="section-title">我的自訂拆分商品</div><div class="grid">` +
         state.customSplits.map((c,i)=>`
-        <div class="pcard" onclick="openCustomSplitGift(${i})">
+        <div class="pcard" onclick="openCustomSplitGift(${i},'${mode}')">
           <div class="pname">${c.name}</div>
           <div class="pspec">每份成本 ${fmt(c.boxCost/c.units)}</div>
           <div class="pcost">整包成本 <b>${fmt(c.boxCost)}</b></div>
@@ -599,57 +595,65 @@ function addDirect(id){
 }
 function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
 
-// ---------- GIFT MODAL ----------
-function openGiftModal(id){
+// ---------- GIFT / SELF-USE MODAL ----------
+function openGiftModal(id, mode){
+  mode = mode || 'gift';
+  const label = mode==='self' ? '自用' : '贈品';
   const p = PRODUCTS.find(x=>x.id===id);
-  document.getElementById('mName').textContent = p.name + '（贈品）';
+  document.getElementById('mName').textContent = p.name + '（'+label+'）';
   document.getElementById('mSpec').textContent = p.spec;
-  let html = `<div class="opt-group"><div class="opt-label">整份贈送</div>
+  let html = `<div class="opt-group"><div class="opt-label">整份${label}</div>
     <div class="split-row">
       <span style="flex:1;">整份，成本 ${fmt(myCost(p))}／份</span>
       <input type="number" id="giftQtyFull" value="1" min="1">
-      <button class="btn btn-gold" onclick="addGiftToCart('${p.id}',false)">加入</button>
+      <button class="btn btn-gold" onclick="addGiftToCart('${p.id}',false,'${mode}')">加入</button>
     </div></div>`;
   if(p.split>1){
-    html += `<div class="opt-group"><div class="opt-label">拆份贈送（本商品每 ${p.split} 份/包，單份成本 ${fmt(myCost(p)/p.split)}）</div>
+    html += `<div class="opt-group"><div class="opt-label">拆份${label}（本商品每 ${p.split} 份/包，單份成本 ${fmt(myCost(p)/p.split)}）</div>
       <div class="split-row">
         <span style="flex:1;">拆出份數</span>
         <input type="number" id="giftQtySplit" value="1" min="1">
-        <button class="btn btn-gold" onclick="addGiftToCart('${p.id}',true)">加入</button>
+        <button class="btn btn-gold" onclick="addGiftToCart('${p.id}',true,'${mode}')">加入</button>
       </div></div>`;
   }
   document.getElementById('mBody').innerHTML = html;
   document.getElementById('overlay').classList.add('show');
 }
-function addGiftToCart(id, isSplit){
+function addGiftToCart(id, isSplit, mode){
+  mode = mode || 'gift';
+  const label = mode==='self' ? '自用' : '贈品';
   const p = PRODUCTS.find(x=>x.id===id);
   const qty = Number(document.getElementById(isSplit?'giftQtySplit':'giftQtyFull').value) || 1;
   const unitCost = isSplit ? myCost(p)/p.split : myCost(p);
   state.cart.push({
     pid: p.id,
-    name: p.name + (isSplit? '（贈品-拆份）':'（贈品-整份）'),
-    qty, unitRev: 0, unitCost, kind:'gift'
+    name: p.name + (isSplit? '（'+label+'-拆份）':'（'+label+'-整份）'),
+    qty, unitRev: 0, unitCost, kind: mode
   });
   closeModal();
   renderCart();
 }
-function openCustomSplitGift(i){
+function openCustomSplitGift(i, mode){
+  mode = mode || 'gift';
+  const label = mode==='self' ? '自用' : '贈品';
   const c = state.customSplits[i];
-  document.getElementById('mName').textContent = c.name + '（贈品）';
+  document.getElementById('mName').textContent = c.name + '（'+label+'）';
   document.getElementById('mSpec').textContent = '整包成本 ' + fmt(c.boxCost) + '，可拆 ' + c.units + ' 份';
   document.getElementById('mBody').innerHTML = `
-    <div class="opt-group"><div class="opt-label">拆份贈送（單份成本 ${fmt(c.boxCost/c.units)}）</div>
+    <div class="opt-group"><div class="opt-label">拆份${label}（單份成本 ${fmt(c.boxCost/c.units)}）</div>
       <div class="split-row">
         <span style="flex:1;">拆出份數</span>
         <input type="number" id="csGiftQty" value="1" min="1">
-        <button class="btn btn-gold" onclick="addCustomSplitGiftToCart(${i})">加入</button>
+        <button class="btn btn-gold" onclick="addCustomSplitGiftToCart(${i},'${mode}')">加入</button>
       </div></div>`;
   document.getElementById('overlay').classList.add('show');
 }
-function addCustomSplitGiftToCart(i){
+function addCustomSplitGiftToCart(i, mode){
+  mode = mode || 'gift';
+  const label = mode==='self' ? '自用' : '贈品';
   const c = state.customSplits[i];
   const qty = Number(document.getElementById('csGiftQty').value) || 1;
-  state.cart.push({ pid:'cs:'+c.name, name: c.name + '（贈品-拆份）', qty, unitRev:0, unitCost: c.boxCost/c.units, kind:'gift' });
+  state.cart.push({ pid:'cs:'+c.name, name: c.name + '（'+label+'-拆份）', qty, unitRev:0, unitCost: c.boxCost/c.units, kind: mode });
   closeModal();
   renderCart();
 }
@@ -861,7 +865,7 @@ function navReport(delta){
   }
   renderReport();
 }
-const KIND_LABEL = {downline:'賣給下線', retail:'零售給消費者', gift:'贈品成本', fixed:'固定項目', custom:'自訂項目'};
+const KIND_LABEL = {downline:'賣給下線', retail:'零售給消費者', gift:'贈品成本', self:'自用成本', fixed:'固定項目', custom:'自訂項目'};
 function renderReport(){
   document.getElementById('rp-month').classList.toggle('active', state.reportMode==='month');
   document.getElementById('rp-year').classList.toggle('active', state.reportMode==='year');
@@ -1010,8 +1014,8 @@ async function handleImportFile(e){
 // ---------- INVENTORY / STOCK ----------
 function allInventoryItems(){
   return [
-    ...PRODUCTS.map(p=>({id:p.id, name:p.name, spec:p.spec})),
-    ...state.customSplits.map(c=>({id:'cs:'+c.name, name:c.name, spec:'自訂拆分商品'}))
+    ...PRODUCTS.map(p=>({id:p.id, name:p.name, spec:p.spec, cat:p.cat})),
+    ...state.customSplits.map(c=>({id:'cs:'+c.name, name:c.name, spec:'自訂拆分商品', cat:'custom'}))
   ];
 }
 function defaultUnitCostForStock(pid, source){
@@ -1024,26 +1028,102 @@ function defaultUnitCostForStock(pid, source){
   const p = PRODUCTS.find(x=>x.id===pid);
   return p ? myCost(p) : 0;
 }
-function initStockProductSelect(){
-  const sel = document.getElementById('stkProduct');
-  const items = allInventoryItems();
-  sel.innerHTML = items.map(it=>`<option value="${it.id}">${it.name}（${it.spec}）</option>`).join('');
-  onStockSourceChange();
+function computeStockMap(){
+  const byPid = {};
+  state.stockEntries.forEach(e=>{
+    if(!byPid[e.pid]) byPid[e.pid] = {qty:0, costValue:0, offline:0, online:0, promo:0};
+    byPid[e.pid].qty += e.qty;
+    byPid[e.pid].costValue += e.qty*e.unitCost;
+    if(e.source==='線下叫貨') byPid[e.pid].offline += e.qty;
+    else if(e.source==='線上雲倉') byPid[e.pid].online += e.qty;
+    else byPid[e.pid].promo += e.qty;
+  });
+  const soldMap = {};
+  state.orders.forEach(o=>o.items.forEach(it=>{
+    if(it.pid && (it.kind==='downline'||it.kind==='retail'||it.kind==='gift'||it.kind==='self')){
+      soldMap[it.pid] = (soldMap[it.pid]||0) + it.qty;
+    }
+  }));
+  return {byPid, soldMap};
 }
-function onStockSourceChange(){
-  const pid = document.getElementById('stkProduct').value;
+function stockInfoFor(pid){
+  const {byPid, soldMap} = computeStockMap();
+  const b = byPid[pid] || {qty:0, costValue:0, offline:0, online:0, promo:0};
+  const sold = soldMap[pid] || 0;
+  const remain = b.qty - sold;
+  const avgCost = b.qty>0 ? b.costValue/b.qty : 0;
+  return {inQty:b.qty, sold, remain, avgCost, value:remain*avgCost, offline:b.offline, online:b.online, promo:b.promo};
+}
+const STOCK_CATS = [{id:'fiber',label:'纖體保健'},{id:'skin',label:'美肌'},{id:'custom',label:'自訂拆分商品'}];
+function initStockCatTabs(){
+  const el = document.getElementById('stockCatTabs');
+  el.innerHTML = STOCK_CATS.map(c=>`<div class="cat-tab ${c.id===state.stockCat?'active':''}" data-cat="${c.id}">${c.label}</div>`).join('');
+  el.querySelectorAll('.cat-tab').forEach(t=>{
+    t.onclick = ()=>{ state.stockCat = t.dataset.cat; initStockCatTabs(); renderStockGrid(); };
+  });
+}
+function renderStockGrid(){
+  const items = allInventoryItems().filter(it=>it.cat===state.stockCat);
+  const el = document.getElementById('stockGrid');
+  el.innerHTML = items.length ? `<div class="grid">` + items.map(it=>{
+    const info = stockInfoFor(it.id);
+    const color = info.remain<0 ? 'var(--brick)' : (info.remain===0 ? 'var(--ink-soft)' : 'var(--forest)');
+    return `<div class="stock-card" onclick="openStockAddModal('${it.id}')">
+      <div class="pname">${it.name}</div>
+      <div class="pspec">${it.spec}</div>
+      <div class="stock-num" style="color:${color};">${info.remain}</div>
+      <div class="stock-sub">線下${info.offline}／線上${info.online}／贈品${info.promo}<br>已出貨${info.sold} · 估值${fmt(info.value)}</div>
+    </div>`;
+  }).join('') + `</div>` : `<div class="empty">此分類尚無商品</div>`;
+
+  // total value across ALL categories
+  const all = allInventoryItems();
+  const totalValue = all.reduce((s,it)=>s+Math.max(stockInfoFor(it.id).value,0), 0);
+  document.getElementById('stockTotalValue').textContent = fmt(totalValue);
+}
+function openStockAddModal(pid){
+  const item = allInventoryItems().find(x=>x.id===pid);
+  if(!item) return;
+  const info = stockInfoFor(pid);
+  document.getElementById('mName').textContent = item.name;
+  document.getElementById('mSpec').textContent = item.spec;
+  document.getElementById('mBody').innerHTML = `
+    <div class="opt-group">
+      <div style="font-size:13px;line-height:1.7;">
+        目前庫存 <b style="font-size:17px;color:${info.remain<0?'var(--brick)':'var(--forest)'};">${info.remain}</b><br>
+        進貨 ${info.inQty}（線下 ${info.offline}／線上 ${info.online}／活動贈品 ${info.promo}） · 已出貨 ${info.sold}<br>
+        平均成本 ${fmt(info.avgCost)} · 估值 ${fmt(info.value)}
+      </div>
+    </div>
+    <div class="custom-form" style="padding:0;border:none;">
+      <div class="row">
+        <select id="stkSource" onchange="onStockModalSourceChange('${pid}')">
+          <option value="線下叫貨">線下叫貨</option>
+          <option value="線上雲倉">線上雲倉</option>
+          <option value="活動贈品轉入">活動贈品轉入（成本$0）</option>
+        </select>
+        <input id="stkQty" type="number" placeholder="數量" min="1">
+      </div>
+      <div class="row">
+        <input id="stkCost" type="number" placeholder="單件成本">
+        <input id="stkDate" type="date">
+      </div>
+      <div class="row"><input id="stkNote" placeholder="備註（例如：活動名稱，選填）"></div>
+      <button class="btn btn-gold btn-full" onclick="confirmAddStock('${pid}')">新增進貨</button>
+    </div>`;
+  document.getElementById('mFooter').innerHTML = '';
+  document.getElementById('stkDate').value = todayStr();
+  onStockModalSourceChange(pid);
+  document.getElementById('overlay').classList.add('show');
+}
+function onStockModalSourceChange(pid){
   const source = document.getElementById('stkSource').value;
   const costInput = document.getElementById('stkCost');
   costInput.value = defaultUnitCostForStock(pid, source);
   costInput.disabled = (source==='活動贈品轉入');
 }
-document.addEventListener('change', (e)=>{
-  if(e.target && e.target.id==='stkProduct') onStockSourceChange();
-});
-async function addStockEntry(){
-  const pid = document.getElementById('stkProduct').value;
+async function confirmAddStock(pid){
   const item = allInventoryItems().find(x=>x.id===pid);
-  if(!item){ alert('請先在拆分設定新增至少一個商品，或選擇既有商品'); return; }
   const source = document.getElementById('stkSource').value;
   const qty = Number(document.getElementById('stkQty').value) || 0;
   if(qty<=0){ alert('請輸入進貨數量'); return; }
@@ -1052,8 +1132,7 @@ async function addStockEntry(){
   const note = document.getElementById('stkNote').value.trim();
   state.stockEntries.unshift({ id:Date.now(), pid, name:item.name, source, qty, unitCost, date:dateVal, note });
   await saveStock();
-  document.getElementById('stkQty').value='';
-  document.getElementById('stkNote').value='';
+  closeModal();
   renderStockTab();
 }
 async function deleteStockEntry(i){
@@ -1063,43 +1142,8 @@ async function deleteStockEntry(i){
   renderStockTab();
 }
 function renderStockTab(){
-  initStockProductSelect();
-  if(!document.getElementById('stkDate').value) document.getElementById('stkDate').value = todayStr();
-
-  const byPid = {};
-  state.stockEntries.forEach(e=>{
-    if(!byPid[e.pid]) byPid[e.pid] = {name:e.name, qty:0, costValue:0, offline:0, online:0, promo:0};
-    byPid[e.pid].qty += e.qty;
-    byPid[e.pid].costValue += e.qty*e.unitCost;
-    if(e.source==='線下叫貨') byPid[e.pid].offline += e.qty;
-    else if(e.source==='線上雲倉') byPid[e.pid].online += e.qty;
-    else byPid[e.pid].promo += e.qty;
-  });
-  const soldMap = {};
-  state.orders.forEach(o=>o.items.forEach(it=>{
-    if(it.pid && (it.kind==='downline'||it.kind==='retail'||it.kind==='gift')){
-      soldMap[it.pid] = (soldMap[it.pid]||0) + it.qty;
-    }
-  }));
-  const rows = Object.keys(byPid).map(pid=>{
-    const b = byPid[pid];
-    const sold = soldMap[pid]||0;
-    const remain = b.qty - sold;
-    const avgCost = b.qty>0 ? b.costValue/b.qty : 0;
-    return {name:b.name, inQty:b.qty, sold, remain, value:remain*avgCost, avgCost, b};
-  }).sort((a,b)=>b.remain-a.remain);
-
-  const totalValue = rows.reduce((s,r)=>s+Math.max(r.value,0),0);
-  document.getElementById('stockTotalValue').textContent = fmt(totalValue);
-
-  const el = document.getElementById('stockSummary');
-  el.innerHTML = rows.length ? rows.map(r=>`
-    <div class="line">
-      <div class="line-top"><div class="line-name">${r.name}</div><div style="font-weight:900;color:${r.remain<0?'var(--brick)':'var(--forest)'};">庫存 ${r.remain}</div></div>
-      <div class="line-meta">進貨 ${r.inQty}（線下 ${r.b.offline}／線上 ${r.b.online}／活動贈品 ${r.b.promo}） · 已出貨 ${r.sold}</div>
-      <div class="line-nums"><span>平均成本 <b>${fmt(r.avgCost)}</b></span><span>庫存估值 <b>${fmt(r.value)}</b></span></div>
-    </div>
-  `).join('') : `<div class="empty">尚無進貨紀錄</div>`;
+  initStockCatTabs();
+  renderStockGrid();
 
   const hEl = document.getElementById('stockHistory');
   hEl.innerHTML = state.stockEntries.length ? state.stockEntries.map((e,i)=>`
@@ -1147,7 +1191,6 @@ async function removeCustomSplit(i){
   renderProducts();
   renderCart();
   document.getElementById('cartDate').value = todayStr();
-  document.getElementById('stkDate').value = todayStr();
   attachRealtimeSync();
 })();
 </script>
