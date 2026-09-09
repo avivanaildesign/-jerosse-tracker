@@ -407,6 +407,7 @@ let state = {
   customSplits: [],
   stockEntries: [],
   stockCat: 'fiber',
+  editingOrderId: null,
   reportMode: 'month',
   reportYear: new Date().getFullYear(),
   reportMonth: new Date().getMonth()
@@ -729,9 +730,25 @@ function todayStr(){
 }
 function clearCart(){
   state.cart=[];
+  state.editingOrderId = null;
   document.getElementById('cartCustomer').value='';
   document.getElementById('cartNote').value='';
   document.getElementById('cartDate').value = todayStr();
+  renderCart();
+}
+function cancelEditOrder(){
+  clearCart();
+}
+function editOrder(i){
+  const o = state.orders[i];
+  state.cart = JSON.parse(JSON.stringify(o.items));
+  state.editingOrderId = o.id;
+  document.querySelector('.tab[data-tab="new"]').click();
+  document.getElementById('cartCustomer').value = o.customer==='未填寫' ? '' : o.customer;
+  document.getElementById('cartNote').value = o.note || '';
+  const d = new Date(o.date);
+  const pad = n=> String(n).padStart(2,'0');
+  document.getElementById('cartDate').value = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
   renderCart();
 }
 
@@ -742,18 +759,40 @@ async function saveOrder(){
   const [y,m,d] = dateVal.split('-').map(Number);
   const now = new Date();
   const saleDate = new Date(y, m-1, d, now.getHours(), now.getMinutes(), now.getSeconds());
+  const customer = document.getElementById('cartCustomer').value.trim() || '未填寫';
+  const note = document.getElementById('cartNote').value.trim();
+  const items = JSON.parse(JSON.stringify(state.cart));
+
+  if(state.editingOrderId){
+    const idx = state.orders.findIndex(o=>o.id===state.editingOrderId);
+    if(idx>-1){
+      state.orders[idx] = { ...state.orders[idx], customer, note, date: saleDate.toISOString(), tier: state.tier, items, rev:t.rev, cost:t.cost, profit:t.profit };
+    }
+    await saveOrders();
+    clearCart();
+    renderOrders();
+    renderStockTab();
+    renderDash();
+    renderReport();
+    alert('訂單已更新！');
+    document.querySelector('.tab[data-tab="orders"]').click();
+    return;
+  }
+
   const order = {
     id: Date.now(),
-    customer: document.getElementById('cartCustomer').value.trim() || '未填寫',
-    note: document.getElementById('cartNote').value.trim(),
+    customer, note,
     date: saleDate.toISOString(),
     tier: state.tier,
-    items: JSON.parse(JSON.stringify(state.cart)),
+    items,
     rev: t.rev, cost: t.cost, profit: t.profit
   };
   state.orders.unshift(order);
   await saveOrders();
   clearCart();
+  renderStockTab();
+  renderDash();
+  renderReport();
   alert('訂單已儲存！');
 }
 
@@ -774,7 +813,10 @@ function renderOrders(){
       </div>
       <div class="order-detail" id="odetail-${i}">
         ${o.items.map(it=>`<div class="line-nums" style="margin-top:4px;"><span>${it.name} ×${it.qty}</span><b>${fmt((it.unitRev-it.unitCost)*it.qty)}</b></div>`).join('')}
-        <button class="btn btn-ghost order-del" onclick="deleteOrder(${i})">刪除此訂單</button>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="btn btn-ghost" style="flex:1;" onclick="editOrder(${i})">編輯</button>
+          <button class="btn btn-ghost" style="flex:1;color:var(--brick);" onclick="deleteOrder(${i})">刪除</button>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -785,6 +827,9 @@ async function deleteOrder(i){
   state.orders.splice(i,1);
   await saveOrders();
   renderOrders();
+  renderStockTab();
+  renderDash();
+  renderReport();
 }
 
 // ---------- DASHBOARD ----------
