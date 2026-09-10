@@ -607,28 +607,36 @@ function openGiftModal(id, mode){
     <div class="split-row">
       <span style="flex:1;">整份，成本 ${fmt(myCost(p))}／份</span>
       <input type="number" id="giftQtyFull" value="1" min="1">
-      <button class="btn btn-gold" onclick="addGiftToCart('${p.id}',false,'${mode}')">加入</button>
+      <button class="btn btn-gold" onclick="addGiftToCart('${p.id}','full','${mode}')">加入</button>
     </div></div>`;
   if(p.split>1){
     html += `<div class="opt-group"><div class="opt-label">拆份${label}（本商品每 ${p.split} 份/包，單份成本 ${fmt(myCost(p)/p.split)}）</div>
       <div class="split-row">
         <span style="flex:1;">拆出份數</span>
         <input type="number" id="giftQtySplit" value="1" min="1">
-        <button class="btn btn-gold" onclick="addGiftToCart('${p.id}',true,'${mode}')">加入</button>
+        <button class="btn btn-gold" onclick="addGiftToCart('${p.id}','split','${mode}')">加入</button>
       </div></div>`;
   }
+  html += `<div class="opt-group"><div class="opt-label">從活動贈品庫存出（成本 $0）</div>
+    <div class="split-row">
+      <span style="flex:1;">份數</span>
+      <input type="number" id="giftQtyFree" value="1" min="1">
+      <button class="btn btn-gold" onclick="addGiftToCart('${p.id}','free','${mode}')">加入</button>
+    </div></div>`;
   document.getElementById('mBody').innerHTML = html;
   document.getElementById('overlay').classList.add('show');
 }
-function addGiftToCart(id, isSplit, mode){
+function addGiftToCart(id, variant, mode){
   mode = mode || 'gift';
   const label = mode==='self' ? '自用' : '贈品';
   const p = PRODUCTS.find(x=>x.id===id);
-  const qty = Number(document.getElementById(isSplit?'giftQtySplit':'giftQtyFull').value) || 1;
-  const unitCost = isSplit ? myCost(p)/p.split : myCost(p);
+  const inputId = variant==='split' ? 'giftQtySplit' : (variant==='free' ? 'giftQtyFree' : 'giftQtyFull');
+  const qty = Number(document.getElementById(inputId).value) || 1;
+  const unitCost = variant==='split' ? myCost(p)/p.split : (variant==='free' ? 0 : myCost(p));
+  const suffix = variant==='split' ? '拆份' : (variant==='free' ? '活動贈品免費' : '整份');
   state.cart.push({
     pid: p.id,
-    name: p.name + (isSplit? '（'+label+'-拆份）':'（'+label+'-整份）'),
+    name: p.name + '（'+label+'-'+suffix+'）',
     qty, unitRev: 0, unitCost, kind: mode
   });
   closeModal();
@@ -645,16 +653,25 @@ function openCustomSplitGift(i, mode){
       <div class="split-row">
         <span style="flex:1;">拆出份數</span>
         <input type="number" id="csGiftQty" value="1" min="1">
-        <button class="btn btn-gold" onclick="addCustomSplitGiftToCart(${i},'${mode}')">加入</button>
+        <button class="btn btn-gold" onclick="addCustomSplitGiftToCart(${i},'split','${mode}')">加入</button>
+      </div></div>
+    <div class="opt-group"><div class="opt-label">從活動贈品庫存出（成本 $0）</div>
+      <div class="split-row">
+        <span style="flex:1;">份數</span>
+        <input type="number" id="csGiftQtyFree" value="1" min="1">
+        <button class="btn btn-gold" onclick="addCustomSplitGiftToCart(${i},'free','${mode}')">加入</button>
       </div></div>`;
   document.getElementById('overlay').classList.add('show');
 }
-function addCustomSplitGiftToCart(i, mode){
+function addCustomSplitGiftToCart(i, variant, mode){
   mode = mode || 'gift';
   const label = mode==='self' ? '自用' : '贈品';
   const c = state.customSplits[i];
-  const qty = Number(document.getElementById('csGiftQty').value) || 1;
-  state.cart.push({ pid:'cs:'+c.name, name: c.name + '（'+label+'-拆份）', qty, unitRev:0, unitCost: c.boxCost/c.units, kind: mode });
+  const inputId = variant==='free' ? 'csGiftQtyFree' : 'csGiftQty';
+  const qty = Number(document.getElementById(inputId).value) || 1;
+  const unitCost = variant==='free' ? 0 : (c.boxCost/c.units);
+  const suffix = variant==='free' ? '活動贈品免費' : '拆份';
+  state.cart.push({ pid:'cs:'+c.name, name: c.name + '（'+label+'-'+suffix+'）', qty, unitRev:0, unitCost, kind: mode });
   closeModal();
   renderCart();
 }
