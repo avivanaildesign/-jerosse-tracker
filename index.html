@@ -602,7 +602,7 @@ function addDirect(id){
   const cost = myCost(p);
   const idx = state.cart.findIndex(it=>it.pid===id && it.label===info.label);
   if(idx>-1){ state.cart[idx].qty++; }
-  else { state.cart.push({pid:id, name:p.name+'（'+info.label+'）', qty:1, unitRev:price, unitCost:cost, kind:info.kind, label:info.label}); }
+  else { state.cart.push({pid:id, name:p.name+'（'+info.label+'）', qty:1, unitRev:price, unitCost:cost, kind:info.kind, label:info.label, unitType:'box'}); }
   renderCart();
 }
 function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
@@ -648,7 +648,7 @@ function addGiftToCart(id, variant, mode){
   state.cart.push({
     pid: p.id,
     name: p.name + '（'+label+'-'+suffix+'）',
-    qty, unitRev: 0, unitCost, kind: mode
+    qty, unitRev: 0, unitCost, kind: mode, unitType: variant==='split' ? 'piece' : 'box'
   });
   closeModal();
   renderCart();
@@ -682,7 +682,7 @@ function addCustomSplitGiftToCart(i, variant, mode){
   const qty = Number(document.getElementById(inputId).value) || 1;
   const unitCost = variant==='free' ? 0 : (c.boxCost/c.units);
   const suffix = variant==='free' ? '活動贈品免費' : '拆份';
-  state.cart.push({ pid:'cs:'+c.name, name: c.name + '（'+label+'-'+suffix+'）', qty, unitRev:0, unitCost, kind: mode });
+  state.cart.push({ pid:'cs:'+c.name, name: c.name + '（'+label+'-'+suffix+'）', qty, unitRev:0, unitCost, kind: mode, unitType:'piece' });
   closeModal();
   renderCart();
 }
@@ -722,7 +722,7 @@ function confirmSplitSale(id, mode){
   const price = Number(document.getElementById(isPiece?'ssPricePiece':'ssPriceWhole').value) || 0;
   const cost = isPiece ? myCost(p)/p.split : myCost(p);
   const label = isPiece ? '拆件自訂價' : '整件自訂價';
-  state.cart.push({ pid:p.id, name: p.name+'（'+label+'）', qty, unitRev:price, unitCost:cost, kind:'retail' });
+  state.cart.push({ pid:p.id, name: p.name+'（'+label+'）', qty, unitRev:price, unitCost:cost, kind:'retail', unitType: isPiece ? 'piece' : 'box' });
   closeModal();
   renderCart();
 }
@@ -1141,20 +1141,33 @@ function defaultUnitCostForStock(pid, source){
   const p = PRODUCTS.find(x=>x.id===pid);
   return p ? myCost(p) : 0;
 }
+function pieceFactor(pid){
+  if(pid.startsWith('cs:')) return 1;
+  const p = PRODUCTS.find(x=>x.id===pid);
+  return (p && p.split>1) ? p.split : 1;
+}
+function inferUnitType(it){
+  if(it.unitType) return it.unitType;
+  if(it.name && it.name.indexOf('拆')>-1) return 'piece';
+  return 'box';
+}
 function computeStockMap(){
   const byPid = {};
   state.stockEntries.forEach(e=>{
+    const factor = pieceFactor(e.pid);
+    const pieces = e.qty * factor;
     if(!byPid[e.pid]) byPid[e.pid] = {qty:0, costValue:0, offline:0, online:0, promo:0};
-    byPid[e.pid].qty += e.qty;
+    byPid[e.pid].qty += pieces;
     byPid[e.pid].costValue += e.qty*e.unitCost;
-    if(e.source==='線下叫貨') byPid[e.pid].offline += e.qty;
-    else if(e.source==='線上雲倉') byPid[e.pid].online += e.qty;
-    else byPid[e.pid].promo += e.qty;
+    if(e.source==='線下叫貨') byPid[e.pid].offline += pieces;
+    else if(e.source==='線上雲倉') byPid[e.pid].online += pieces;
+    else byPid[e.pid].promo += pieces;
   });
   const soldMap = {};
   state.orders.forEach(o=>o.items.forEach(it=>{
     if(it.pid && (it.kind==='downline'||it.kind==='retail'||it.kind==='gift'||it.kind==='self')){
-      soldMap[it.pid] = (soldMap[it.pid]||0) + it.qty;
+      const factor = inferUnitType(it)==='piece' ? 1 : pieceFactor(it.pid);
+      soldMap[it.pid] = (soldMap[it.pid]||0) + it.qty*factor;
     }
   }));
   return {byPid, soldMap};
@@ -1184,8 +1197,8 @@ function renderStockGrid(){
     return `<div class="stock-card" onclick="openStockAddModal('${it.id}')">
       <div class="pname">${it.name}</div>
       <div class="pspec">${it.spec}</div>
-      <div class="stock-num" style="color:${color};">${info.remain}</div>
-      <div class="stock-sub">線下${info.offline}／線上${info.online}／贈品${info.promo}<br>已出貨${info.sold} · 估值${fmt(info.value)}</div>
+      <div class="stock-num" style="color:${color};">${info.remain}<span style="font-size:12px;font-weight:600;color:var(--ink-soft);"> 件</span></div>
+      <div class="stock-sub">線下${info.offline}／線上${info.online}／贈品${info.promo}（單位：件）<br>已出貨${info.sold}件 · 估值${fmt(info.value)}</div>
     </div>`;
   }).join('') + `</div>` : `<div class="empty">此分類尚無商品</div>`;
 
@@ -1198,14 +1211,16 @@ function openStockAddModal(pid){
   const item = allInventoryItems().find(x=>x.id===pid);
   if(!item) return;
   const info = stockInfoFor(pid);
+  const prod = pid.startsWith('cs:') ? null : PRODUCTS.find(x=>x.id===pid);
+  const qtyLabel = (prod && prod.split>1) ? '數量（盒，系統會自動換算成 '+prod.split+' 件/盒）' : '數量';
   document.getElementById('mName').textContent = item.name;
   document.getElementById('mSpec').textContent = item.spec;
   document.getElementById('mBody').innerHTML = `
     <div class="opt-group">
       <div style="font-size:13px;line-height:1.7;">
-        目前庫存 <b style="font-size:17px;color:${info.remain<0?'var(--brick)':'var(--forest)'};">${info.remain}</b><br>
-        進貨 ${info.inQty}（線下 ${info.offline}／線上 ${info.online}／活動贈品 ${info.promo}） · 已出貨 ${info.sold}<br>
-        平均成本 ${fmt(info.avgCost)} · 估值 ${fmt(info.value)}
+        目前庫存 <b style="font-size:17px;color:${info.remain<0?'var(--brick)':'var(--forest)'};">${info.remain} 件</b><br>
+        進貨 ${info.inQty} 件（線下 ${info.offline}／線上 ${info.online}／活動贈品 ${info.promo}） · 已出貨 ${info.sold} 件<br>
+        平均成本／件 ${fmt(info.avgCost)} · 估值 ${fmt(info.value)}
       </div>
     </div>
     <div class="custom-form" style="padding:0;border:none;">
@@ -1215,10 +1230,10 @@ function openStockAddModal(pid){
           <option value="線上雲倉">線上雲倉</option>
           <option value="活動贈品轉入">活動贈品轉入（成本$0）</option>
         </select>
-        <input id="stkQty" type="number" placeholder="數量" min="1">
+        <input id="stkQty" type="number" placeholder="${qtyLabel}" min="1">
       </div>
       <div class="row">
-        <input id="stkCost" type="number" placeholder="單件成本">
+        <input id="stkCost" type="number" placeholder="${(prod && prod.split>1) ? '單盒成本' : '單件成本'}">
         <input id="stkDate" type="date">
       </div>
       <div class="row"><input id="stkNote" placeholder="備註（例如：活動名稱，選填）"></div>
