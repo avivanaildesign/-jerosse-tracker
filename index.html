@@ -355,23 +355,23 @@ function P(name,spec,cat,costs,retail,split){
 
 const PRODUCTS = [
   // 纖體保健系列
-  P('纖纖飲X','14入/盒','fiber',{'二級輔導督導':880,'三級輔導督導':955,'三級零售加盟商':990,'實習零售加盟商':1160},{single:1480,double:1380,vip:1280}),
-  P('纖飄錠','60錠/盒','fiber',{'二級輔導督導':880,'三級輔導督導':955,'三級零售加盟商':990,'實習零售加盟商':1160},{single:1480,double:1380,vip:1280}),
-  P('雪花紫纖飲','14包/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}),
-  P('爆纖錠','120錠/盒','fiber',{'二級輔導督導':520,'三級輔導督導':560,'三級零售加盟商':580,'實習零售加盟商':660},{single:880,double:800,vip:740}),
+  P('纖纖飲X','14入/盒','fiber',{'二級輔導督導':880,'三級輔導督導':955,'三級零售加盟商':990,'實習零售加盟商':1160},{single:1480,double:1380,vip:1280}, 14),
+  P('纖飄錠','60錠/盒','fiber',{'二級輔導督導':880,'三級輔導督導':955,'三級零售加盟商':990,'實習零售加盟商':1160},{single:1480,double:1380,vip:1280}, 60),
+  P('雪花紫纖飲','14包/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}, 14),
+  P('爆纖錠','120錠/盒','fiber',{'二級輔導督導':520,'三級輔導督導':560,'三級零售加盟商':580,'實習零售加盟商':660},{single:880,double:800,vip:740}, 120),
   P('爆纖錠體驗包','30錠/包','fiber',{'二級輔導督導':146,'三級輔導督導':158,'三級零售加盟商':164,'實習零售加盟商':190},{single:240}),
-  P('植萃纖酵宿','60錠/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}),
+  P('植萃纖酵宿','60錠/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}, 60),
   P('植萃纖酵宿體驗包','10錠/包','fiber',{'二級輔導督導':103,'三級輔導督導':113,'三級零售加盟商':117,'實習零售加盟商':145},{single:190}),
-  P('肽纖飲(可可)','10入/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}),
-  P('肽纖飲(奶茶)','10入/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}),
-  P('複方金盞花葉黃素EX飲','12入/盒','fiber',{'二級輔導督導':640,'三級輔導督導':695,'三級零售加盟商':720,'實習零售加盟商':840},{single:1080,double:990,vip:900}),
-  P('金盞花葉黃素晶亮凍','10入/盒','fiber',{'二級輔導督導':410,'三級輔導督導':440,'三級零售加盟商':455,'實習零售加盟商':530},{single:680,double:630,vip:600}),
-  P('高機能益生菌','30入/盒','fiber',{'二級輔導督導':770,'三級輔導督導':830,'三級零售加盟商':860,'實習零售加盟商':990},{single:1280,double:1180,vip:1100}),
-  P('9國英雄TURBO極速錠','20錠/包','fiber',{'二級輔導督導':410,'三級輔導督導':440,'三級零售加盟商':455,'實習零售加盟商':530},{single:680,double:630,vip:600}),
-  P('療肺草正冠茶','20入/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}),
-  P('固樂纖','60錠/盒','fiber',{'二級輔導督導':920,'三級輔導督導':1040,'三級零售加盟商':1080,'實習零售加盟商':1260},{single:1680,double:1580,vip:1480}),
+  P('肽纖飲(可可)','10入/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}, 10),
+  P('肽纖飲(奶茶)','10入/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}, 10),
+  P('複方金盞花葉黃素EX飲','12入/盒','fiber',{'二級輔導督導':640,'三級輔導督導':695,'三級零售加盟商':720,'實習零售加盟商':840},{single:1080,double:990,vip:900}, 12),
+  P('金盞花葉黃素晶亮凍','10入/盒','fiber',{'二級輔導督導':410,'三級輔導督導':440,'三級零售加盟商':455,'實習零售加盟商':530},{single:680,double:630,vip:600}, 10),
+  P('高機能益生菌','30入/盒','fiber',{'二級輔導督導':770,'三級輔導督導':830,'三級零售加盟商':860,'實習零售加盟商':990},{single:1280,double:1180,vip:1100}, 30),
+  P('9國英雄TURBO極速錠','20錠/包','fiber',{'二級輔導督導':410,'三級輔導督導':440,'三級零售加盟商':455,'實習零售加盟商':530},{single:680,double:630,vip:600}, 20),
+  P('療肺草正冠茶','20入/盒','fiber',{'二級輔導督導':580,'三級輔導督導':635,'三級零售加盟商':660,'實習零售加盟商':780},{single:990,double:900,vip:830}, 20),
+  P('固樂纖','60錠/盒','fiber',{'二級輔導督導':920,'三級輔導督導':1040,'三級零售加盟商':1080,'實習零售加盟商':1260},{single:1680,double:1580,vip:1480}, 60),
   // 美肌系列
-  P('水光錠','60顆/盒','skin',{'二級輔導督導':920,'三級輔導督導':1040,'三級零售加盟商':1080,'實習零售加盟商':1260},{single:1680,double:1580,vip:1480}),
+  P('水光錠','60顆/盒','skin',{'二級輔導督導':920,'三級輔導督導':1040,'三級零售加盟商':1080,'實習零售加盟商':1260},{single:1680,double:1580,vip:1480}, 60),
   P('水光繃帶面膜(精裝盒)','5片/盒','skin',{'二級輔導督導':450,'三級輔導督導':485,'三級零售加盟商':500,'實習零售加盟商':550},{single:700,double:650,vip:600}, 5),
   P('水光繃帶面膜(環保箱)','20片/箱','skin',{'二級輔導督導':1600,'三級輔導督導':1740,'三級零售加盟商':1800,'實習零售加盟商':2000},{double:2200}, 20),
   P('水光繃帶面膜(單片體驗)','1片(30ml)','skin',{'二級輔導督導':20,'三級輔導督導':20,'三級零售加盟商':20,'實習零售加盟商':20},{single:150}),
@@ -518,7 +518,7 @@ document.querySelectorAll('.tab').forEach(tab=>{
 });
 
 // ---------- CATEGORY TABS ----------
-const CATS = [{id:'fiber',label:'纖體保健'},{id:'skin',label:'美肌'},{id:'fixed',label:'固定項目'},{id:'gift',label:'贈品/拆分'},{id:'self',label:'自用'}];
+const CATS = [{id:'fiber',label:'纖體保健'},{id:'skin',label:'美肌'},{id:'fixed',label:'固定項目'},{id:'gift',label:'贈品/拆分'},{id:'self',label:'自用'},{id:'splitsale',label:'拆售/自訂價'}];
 function initCatTabs(){
   const el = document.getElementById('catTabs');
   el.innerHTML = CATS.map(c=>`<div class="cat-tab ${c.id===state.cat?'active':''}" data-cat="${c.id}">${c.label}</div>`).join('');
@@ -565,6 +565,17 @@ function renderProducts(){
           <div class="pspec">每份成本 ${fmt(c.boxCost/c.units)}</div>
           <div class="pcost">整包成本 <b>${fmt(c.boxCost)}</b></div>
         </div>`).join('') + `</div>` : '');
+    return;
+  }
+  if(state.cat==='splitsale'){
+    const list = PRODUCTS.filter(p=>p.cat==='fiber' || p.cat==='skin');
+    area.innerHTML = `<div class="section-title" style="margin-top:0;">選商品，自己填數量與售價</div><div class="grid">` +
+      list.map(p=>`
+      <div class="pcard" onclick="openSplitSaleModal('${p.id}')">
+        <div class="pname">${p.name}</div>
+        <div class="pspec">${p.spec}</div>
+        <div class="pcost">整件成本 <b>${fmt(myCost(p))}</b>${p.split>1 ? '<br>單件成本 <b>'+fmt(myCost(p)/p.split)+'</b>' : ''}</div>
+      </div>`).join('') + `</div>`;
     return;
   }
   const list = PRODUCTS.filter(p=>p.cat===state.cat);
@@ -672,6 +683,46 @@ function addCustomSplitGiftToCart(i, variant, mode){
   const unitCost = variant==='free' ? 0 : (c.boxCost/c.units);
   const suffix = variant==='free' ? '活動贈品免費' : '拆份';
   state.cart.push({ pid:'cs:'+c.name, name: c.name + '（'+label+'-'+suffix+'）', qty, unitRev:0, unitCost, kind: mode });
+  closeModal();
+  renderCart();
+}
+
+// ---------- SPLIT SALE (custom qty & price) ----------
+function openSplitSaleModal(id){
+  const p = PRODUCTS.find(x=>x.id===id);
+  document.getElementById('mName').textContent = p.name;
+  document.getElementById('mSpec').textContent = p.spec + ' · 我的成本（整件）' + fmt(myCost(p));
+  const suggestedWhole = (p.retail && p.retail.single) ? p.retail.single : '';
+  let html = `<div class="opt-group"><div class="opt-label">整件銷售（自訂價格）</div>
+    <div class="split-row" style="flex-wrap:wrap;gap:8px;">
+      <span style="flex:1 1 100%;">數量</span>
+      <input type="number" id="ssQtyWhole" value="1" min="1" style="flex:1;">
+      <span style="flex:1 1 100%;margin-top:6px;">售價／件</span>
+      <input type="number" id="ssPriceWhole" value="${suggestedWhole}" placeholder="輸入售價" style="flex:1;">
+      <button class="btn btn-gold" style="flex:1 1 100%;margin-top:6px;" onclick="confirmSplitSale('${p.id}','whole')">加入</button>
+    </div></div>`;
+  if(p.split>1){
+    html += `<div class="opt-group"><div class="opt-label">拆件銷售（自訂價格，本商品每 ${p.split} 件/盒，單件成本 ${fmt(myCost(p)/p.split)}）</div>
+      <div class="split-row" style="flex-wrap:wrap;gap:8px;">
+        <span style="flex:1 1 100%;">數量（件）</span>
+        <input type="number" id="ssQtyPiece" value="1" min="1" style="flex:1;">
+        <span style="flex:1 1 100%;margin-top:6px;">售價／件</span>
+        <input type="number" id="ssPricePiece" placeholder="輸入售價" style="flex:1;">
+        <button class="btn btn-gold" style="flex:1 1 100%;margin-top:6px;" onclick="confirmSplitSale('${p.id}','piece')">加入</button>
+      </div></div>`;
+  }
+  document.getElementById('mBody').innerHTML = html;
+  document.getElementById('mFooter').innerHTML = '';
+  document.getElementById('overlay').classList.add('show');
+}
+function confirmSplitSale(id, mode){
+  const p = PRODUCTS.find(x=>x.id===id);
+  const isPiece = mode==='piece';
+  const qty = Number(document.getElementById(isPiece?'ssQtyPiece':'ssQtyWhole').value) || 1;
+  const price = Number(document.getElementById(isPiece?'ssPricePiece':'ssPriceWhole').value) || 0;
+  const cost = isPiece ? myCost(p)/p.split : myCost(p);
+  const label = isPiece ? '拆件自訂價' : '整件自訂價';
+  state.cart.push({ pid:p.id, name: p.name+'（'+label+'）', qty, unitRev:price, unitCost:cost, kind:'retail' });
   closeModal();
   renderCart();
 }
