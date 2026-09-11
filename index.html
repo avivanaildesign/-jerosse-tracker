@@ -1188,17 +1188,31 @@ function initStockCatTabs(){
     t.onclick = ()=>{ state.stockCat = t.dataset.cat; initStockCatTabs(); renderStockGrid(); };
   });
 }
+function formatStockQty(pieces, pid){
+  const factor = pieceFactor(pid);
+  if(pieces<0) return {main: pieces+'件', unit:''}; // over-sold warning, keep raw piece count for clarity
+  if(factor<=1) return {main: String(pieces), unit:''};
+  const boxes = Math.floor(pieces/factor);
+  const rem = pieces - boxes*factor;
+  return rem>0 ? {main: String(boxes), unit:'盒 '+rem+'件'} : {main: String(boxes), unit:'盒'};
+}
 function renderStockGrid(){
   const items = allInventoryItems().filter(it=>it.cat===state.stockCat);
   const el = document.getElementById('stockGrid');
   el.innerHTML = items.length ? `<div class="grid">` + items.map(it=>{
     const info = stockInfoFor(it.id);
     const color = info.remain<0 ? 'var(--brick)' : (info.remain===0 ? 'var(--ink-soft)' : 'var(--forest)');
+    const q = formatStockQty(info.remain, it.id);
+    const inQ = formatStockQty(info.inQty, it.id);
+    const offQ = formatStockQty(info.offline, it.id);
+    const onQ = formatStockQty(info.online, it.id);
+    const promoQ = formatStockQty(info.promo, it.id);
+    const soldQ = formatStockQty(info.sold, it.id);
     return `<div class="stock-card" onclick="openStockAddModal('${it.id}')">
       <div class="pname">${it.name}</div>
       <div class="pspec">${it.spec}</div>
-      <div class="stock-num" style="color:${color};">${info.remain}<span style="font-size:12px;font-weight:600;color:var(--ink-soft);"> 件</span></div>
-      <div class="stock-sub">線下${info.offline}／線上${info.online}／贈品${info.promo}（單位：件）<br>已出貨${info.sold}件 · 估值${fmt(info.value)}</div>
+      <div class="stock-num" style="color:${color};">${q.main}<span style="font-size:12px;font-weight:600;color:var(--ink-soft);"> ${q.unit}</span></div>
+      <div class="stock-sub">線下${offQ.main}${offQ.unit}／線上${onQ.main}${onQ.unit}／贈品${promoQ.main}${promoQ.unit}<br>已出貨${soldQ.main}${soldQ.unit} · 估值${fmt(info.value)}</div>
     </div>`;
   }).join('') + `</div>` : `<div class="empty">此分類尚無商品</div>`;
 
@@ -1212,15 +1226,24 @@ function openStockAddModal(pid){
   if(!item) return;
   const info = stockInfoFor(pid);
   const prod = pid.startsWith('cs:') ? null : PRODUCTS.find(x=>x.id===pid);
+  const factor = pieceFactor(pid);
   const qtyLabel = (prod && prod.split>1) ? '數量（盒，系統會自動換算成 '+prod.split+' 件/盒）' : '數量';
+  const q = formatStockQty(info.remain, pid);
+  const inQ = formatStockQty(info.inQty, pid);
+  const offQ = formatStockQty(info.offline, pid);
+  const onQ = formatStockQty(info.online, pid);
+  const promoQ = formatStockQty(info.promo, pid);
+  const soldQ = formatStockQty(info.sold, pid);
+  const avgCostLabel = factor>1 ? '平均成本／盒' : '平均成本';
+  const avgCostVal = factor>1 ? info.avgCost*factor : info.avgCost;
   document.getElementById('mName').textContent = item.name;
   document.getElementById('mSpec').textContent = item.spec;
   document.getElementById('mBody').innerHTML = `
     <div class="opt-group">
       <div style="font-size:13px;line-height:1.7;">
-        目前庫存 <b style="font-size:17px;color:${info.remain<0?'var(--brick)':'var(--forest)'};">${info.remain} 件</b><br>
-        進貨 ${info.inQty} 件（線下 ${info.offline}／線上 ${info.online}／活動贈品 ${info.promo}） · 已出貨 ${info.sold} 件<br>
-        平均成本／件 ${fmt(info.avgCost)} · 估值 ${fmt(info.value)}
+        目前庫存 <b style="font-size:17px;color:${info.remain<0?'var(--brick)':'var(--forest)'};">${q.main}${q.unit}</b><br>
+        進貨 ${inQ.main}${inQ.unit}（線下 ${offQ.main}${offQ.unit}／線上 ${onQ.main}${onQ.unit}／活動贈品 ${promoQ.main}${promoQ.unit}） · 已出貨 ${soldQ.main}${soldQ.unit}<br>
+        ${avgCostLabel} ${fmt(avgCostVal)} · 估值 ${fmt(info.value)}
       </div>
     </div>
     <div class="custom-form" style="padding:0;border:none;">
