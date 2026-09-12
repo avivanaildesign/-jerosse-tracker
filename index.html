@@ -1156,11 +1156,12 @@ function computeStockMap(){
   state.stockEntries.forEach(e=>{
     const factor = pieceFactor(e.pid);
     const pieces = e.qty * factor;
-    if(!byPid[e.pid]) byPid[e.pid] = {qty:0, costValue:0, offline:0, online:0, promo:0};
+    if(!byPid[e.pid]) byPid[e.pid] = {qty:0, costValue:0, offline:0, online:0, promo:0, adjust:0};
     byPid[e.pid].qty += pieces;
     byPid[e.pid].costValue += e.qty*e.unitCost;
     if(e.source==='線下叫貨') byPid[e.pid].offline += pieces;
     else if(e.source==='線上雲倉') byPid[e.pid].online += pieces;
+    else if(e.source==='庫存調整') byPid[e.pid].adjust += pieces;
     else byPid[e.pid].promo += pieces;
   });
   const soldMap = {};
@@ -1174,11 +1175,11 @@ function computeStockMap(){
 }
 function stockInfoFor(pid){
   const {byPid, soldMap} = computeStockMap();
-  const b = byPid[pid] || {qty:0, costValue:0, offline:0, online:0, promo:0};
+  const b = byPid[pid] || {qty:0, costValue:0, offline:0, online:0, promo:0, adjust:0};
   const sold = soldMap[pid] || 0;
   const remain = b.qty - sold;
   const avgCost = b.qty>0 ? b.costValue/b.qty : 0;
-  return {inQty:b.qty, sold, remain, avgCost, value:remain*avgCost, offline:b.offline, online:b.online, promo:b.promo};
+  return {inQty:b.qty, sold, remain, avgCost, value:remain*avgCost, offline:b.offline, online:b.online, promo:b.promo, adjust:b.adjust};
 }
 const STOCK_CATS = [{id:'fiber',label:'纖體保健'},{id:'skin',label:'美肌'},{id:'custom',label:'自訂拆分商品'}];
 function initStockCatTabs(){
@@ -1196,6 +1197,12 @@ function formatStockQty(pieces, pid){
   const rem = pieces - boxes*factor;
   return rem>0 ? {main: String(boxes), unit:'盒 '+rem+'件'} : {main: String(boxes), unit:'盒'};
 }
+function formatAdjust(pieces, pid){
+  const factor = pieceFactor(pid);
+  const sign = pieces>0 ? '+' : '';
+  if(factor<=1) return sign+pieces;
+  return sign + Math.trunc(pieces/factor) + '盒';
+}
 function renderStockGrid(){
   const items = allInventoryItems().filter(it=>it.cat===state.stockCat);
   const el = document.getElementById('stockGrid');
@@ -1208,11 +1215,12 @@ function renderStockGrid(){
     const onQ = formatStockQty(info.online, it.id);
     const promoQ = formatStockQty(info.promo, it.id);
     const soldQ = formatStockQty(info.sold, it.id);
+    const adjustText = info.adjust ? '／調整'+formatAdjust(info.adjust, it.id) : '';
     return `<div class="stock-card" onclick="openStockAddModal('${it.id}')">
       <div class="pname">${it.name}</div>
       <div class="pspec">${it.spec}</div>
       <div class="stock-num" style="color:${color};">${q.main}<span style="font-size:12px;font-weight:600;color:var(--ink-soft);"> ${q.unit}</span></div>
-      <div class="stock-sub">線下${offQ.main}${offQ.unit}／線上${onQ.main}${onQ.unit}／贈品${promoQ.main}${promoQ.unit}<br>已出貨${soldQ.main}${soldQ.unit} · 估值${fmt(info.value)}</div>
+      <div class="stock-sub">線下${offQ.main}${offQ.unit}／線上${onQ.main}${onQ.unit}／贈品${promoQ.main}${promoQ.unit}${adjustText}<br>已出貨${soldQ.main}${soldQ.unit} · 估值${fmt(info.value)}</div>
     </div>`;
   }).join('') + `</div>` : `<div class="empty">此分類尚無商品</div>`;
 
@@ -1242,7 +1250,7 @@ function openStockAddModal(pid){
     <div class="opt-group">
       <div style="font-size:13px;line-height:1.7;">
         目前庫存 <b style="font-size:17px;color:${info.remain<0?'var(--brick)':'var(--forest)'};">${q.main}${q.unit}</b><br>
-        進貨 ${inQ.main}${inQ.unit}（線下 ${offQ.main}${offQ.unit}／線上 ${onQ.main}${onQ.unit}／活動贈品 ${promoQ.main}${promoQ.unit}） · 已出貨 ${soldQ.main}${soldQ.unit}<br>
+        進貨 ${inQ.main}${inQ.unit}（線下 ${offQ.main}${offQ.unit}／線上 ${onQ.main}${onQ.unit}／活動贈品 ${promoQ.main}${promoQ.unit}${info.adjust ? '／調整 '+formatAdjust(info.adjust, pid) : ''}） · 已出貨 ${soldQ.main}${soldQ.unit}<br>
         ${avgCostLabel} ${fmt(avgCostVal)} · 估值 ${fmt(info.value)}
       </div>
     </div>
@@ -1252,6 +1260,7 @@ function openStockAddModal(pid){
           <option value="線下叫貨">線下叫貨</option>
           <option value="線上雲倉">線上雲倉</option>
           <option value="活動贈品轉入">活動贈品轉入（成本$0）</option>
+          <option value="庫存調整">庫存調整（手動增減，不計成本）</option>
         </select>
         <input id="stkQty" type="number" placeholder="${qtyLabel}" min="1">
       </div>
@@ -1270,15 +1279,26 @@ function openStockAddModal(pid){
 function onStockModalSourceChange(pid){
   const source = document.getElementById('stkSource').value;
   const costInput = document.getElementById('stkCost');
-  costInput.value = defaultUnitCostForStock(pid, source);
-  costInput.disabled = (source==='活動贈品轉入');
+  const qtyInput = document.getElementById('stkQty');
+  if(source==='庫存調整'){
+    costInput.value = 0;
+    costInput.disabled = true;
+    qtyInput.removeAttribute('min');
+    qtyInput.placeholder = '增減數量（正數增加，負數減少，例如 -1）';
+  } else {
+    costInput.value = defaultUnitCostForStock(pid, source);
+    costInput.disabled = (source==='活動贈品轉入');
+    qtyInput.setAttribute('min','1');
+  }
 }
 async function confirmAddStock(pid){
   const item = allInventoryItems().find(x=>x.id===pid);
   const source = document.getElementById('stkSource').value;
   const qty = Number(document.getElementById('stkQty').value) || 0;
-  if(qty<=0){ alert('請輸入進貨數量'); return; }
-  const unitCost = source==='活動贈品轉入' ? 0 : (Number(document.getElementById('stkCost').value)||0);
+  if(source==='庫存調整'){
+    if(qty===0){ alert('請輸入不為0的增減數量'); return; }
+  } else if(qty<=0){ alert('請輸入進貨數量'); return; }
+  const unitCost = (source==='活動贈品轉入' || source==='庫存調整') ? 0 : (Number(document.getElementById('stkCost').value)||0);
   const dateVal = document.getElementById('stkDate').value || todayStr();
   const note = document.getElementById('stkNote').value.trim();
   state.stockEntries.unshift({ id:Date.now(), pid, name:item.name, source, qty, unitCost, date:dateVal, note });
