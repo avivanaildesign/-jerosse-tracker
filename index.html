@@ -473,7 +473,8 @@ function initTierSelect(){
   sel.onchange = ()=>{ state.tier = sel.value; saveTier(); initTargetSelect(); renderProducts(); };
 }
 function targetOptionsList(){
-  return [...downlineTiers().map(t=>({v:t,l:t})),
+  return [{v:state.tier, l:state.tier+'（同級）'},
+    ...downlineTiers().map(t=>({v:t,l:t})),
     {v:'retail_single',l:'零售價'}, {v:'retail_double',l:'兩盒優惠價'}, {v:'retail_vip',l:'VIP價(滿4000)'}];
 }
 function initTargetSelect(){
