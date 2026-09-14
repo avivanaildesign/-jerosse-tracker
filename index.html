@@ -1151,18 +1151,34 @@ function inferUnitType(it){
   if(it.name && it.name.indexOf('拆')>-1) return 'piece';
   return 'box';
 }
+function fifoRemainBySource(pid, soldPieces){
+  const factor = pieceFactor(pid);
+  const entries = state.stockEntries
+    .filter(e=>e.pid===pid && e.source!=='庫存調整')
+    .slice()
+    .sort((a,b)=> (a.date||'').localeCompare(b.date||'') || a.id-b.id);
+  const adjustPieces = state.stockEntries
+    .filter(e=>e.pid===pid && e.source==='庫存調整')
+    .reduce((s,e)=> s + e.qty*factor, 0);
+  let toDeplete = soldPieces;
+  const buckets = {offline:0, online:0, promo:0};
+  entries.forEach(e=>{
+    const pieces = e.qty*factor;
+    const key = e.source==='線下叫貨' ? 'offline' : e.source==='線上雲倉' ? 'online' : 'promo';
+    const used = Math.min(toDeplete, pieces);
+    buckets[key] += (pieces-used);
+    toDeplete -= used;
+  });
+  return {offline:buckets.offline, online:buckets.online, promo:buckets.promo, adjust:adjustPieces};
+}
 function computeStockMap(){
   const byPid = {};
   state.stockEntries.forEach(e=>{
     const factor = pieceFactor(e.pid);
     const pieces = e.qty * factor;
-    if(!byPid[e.pid]) byPid[e.pid] = {qty:0, costValue:0, offline:0, online:0, promo:0, adjust:0};
+    if(!byPid[e.pid]) byPid[e.pid] = {qty:0, costValue:0};
     byPid[e.pid].qty += pieces;
     byPid[e.pid].costValue += e.qty*e.unitCost;
-    if(e.source==='線下叫貨') byPid[e.pid].offline += pieces;
-    else if(e.source==='線上雲倉') byPid[e.pid].online += pieces;
-    else if(e.source==='庫存調整') byPid[e.pid].adjust += pieces;
-    else byPid[e.pid].promo += pieces;
   });
   const soldMap = {};
   state.orders.forEach(o=>o.items.forEach(it=>{
@@ -1175,11 +1191,12 @@ function computeStockMap(){
 }
 function stockInfoFor(pid){
   const {byPid, soldMap} = computeStockMap();
-  const b = byPid[pid] || {qty:0, costValue:0, offline:0, online:0, promo:0, adjust:0};
+  const b = byPid[pid] || {qty:0, costValue:0};
   const sold = soldMap[pid] || 0;
   const remain = b.qty - sold;
   const avgCost = b.qty>0 ? b.costValue/b.qty : 0;
-  return {inQty:b.qty, sold, remain, avgCost, value:remain*avgCost, offline:b.offline, online:b.online, promo:b.promo, adjust:b.adjust};
+  const src = fifoRemainBySource(pid, sold);
+  return {inQty:b.qty, sold, remain, avgCost, value:remain*avgCost, offline:src.offline, online:src.online, promo:src.promo, adjust:src.adjust};
 }
 const STOCK_CATS = [{id:'fiber',label:'纖體保健'},{id:'skin',label:'美肌'},{id:'custom',label:'自訂拆分商品'}];
 function initStockCatTabs(){
@@ -1220,7 +1237,7 @@ function renderStockGrid(){
       <div class="pname">${it.name}</div>
       <div class="pspec">${it.spec}</div>
       <div class="stock-num" style="color:${color};">${q.main}<span style="font-size:12px;font-weight:600;color:var(--ink-soft);"> ${q.unit}</span></div>
-      <div class="stock-sub">線下${offQ.main}${offQ.unit}／線上${onQ.main}${onQ.unit}／贈品${promoQ.main}${promoQ.unit}${adjustText}<br>已出貨${soldQ.main}${soldQ.unit} · 估值${fmt(info.value)}</div>
+      <div class="stock-sub">線下${offQ.main}${offQ.unit}／線上${onQ.main}${onQ.unit}／贈品${promoQ.main}${promoQ.unit}${adjustText}<br>累計已出貨${soldQ.main}${soldQ.unit} · 估值${fmt(info.value)}</div>
     </div>`;
   }).join('') + `</div>` : `<div class="empty">此分類尚無商品</div>`;
 
@@ -1250,7 +1267,8 @@ function openStockAddModal(pid){
     <div class="opt-group">
       <div style="font-size:13px;line-height:1.7;">
         目前庫存 <b style="font-size:17px;color:${info.remain<0?'var(--brick)':'var(--forest)'};">${q.main}${q.unit}</b><br>
-        進貨 ${inQ.main}${inQ.unit}（線下 ${offQ.main}${offQ.unit}／線上 ${onQ.main}${onQ.unit}／活動贈品 ${promoQ.main}${promoQ.unit}${info.adjust ? '／調整 '+formatAdjust(info.adjust, pid) : ''}） · 已出貨 ${soldQ.main}${soldQ.unit}<br>
+        其中：線下 ${offQ.main}${offQ.unit}／線上 ${onQ.main}${onQ.unit}／活動贈品 ${promoQ.main}${promoQ.unit}${info.adjust ? '／調整 '+formatAdjust(info.adjust, pid) : ''}<br>
+        累計進貨 ${inQ.main}${inQ.unit} · 累計已出貨 ${soldQ.main}${soldQ.unit}<br>
         ${avgCostLabel} ${fmt(avgCostVal)} · 估值 ${fmt(info.value)}
       </div>
     </div>
