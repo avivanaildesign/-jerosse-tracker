@@ -115,6 +115,15 @@ body{background:var(--paper);color:var(--ink);font-family:'Noto Sans TC',sans-se
 
 /* order history cards */
 .order-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:10px;}
+.month-group{margin-bottom:14px;}
+.month-head{display:flex;justify-content:space-between;align-items:center;background:var(--ink);color:#fff;border-radius:12px;padding:11px 14px;cursor:pointer;}
+.month-head .mtitle{font-family:'Noto Serif TC',serif;font-weight:700;font-size:14px;}
+.month-head .mtitle .arrow{display:inline-block;margin-right:6px;transition:.15s;}
+.month-head .mtitle .arrow.open{transform:rotate(90deg);}
+.month-head .msub{font-size:11.5px;color:#C9BFD0;margin-top:2px;}
+.month-head .mprofit{font-weight:900;font-variant-numeric:tabular-nums;}
+.month-body{padding-top:10px;display:none;}
+.month-body.show{display:block;}
 .order-head{display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
 .order-head .oname{font-weight:700;font-size:14px;}
 .order-head .odate{font-size:11px;color:var(--ink-soft);}
@@ -408,6 +417,7 @@ let state = {
   stockEntries: [],
   stockCat: 'fiber',
   editingOrderId: null,
+  monthExpanded: {},
   reportMode: 'month',
   reportYear: new Date().getFullYear(),
   reportMonth: new Date().getMonth()
@@ -866,27 +876,66 @@ async function saveOrder(){
 }
 
 // ---------- ORDERS TAB ----------
+function toggleMonth(key){
+  state.monthExpanded[key] = !state.monthExpanded[key];
+  renderOrders();
+}
 function renderOrders(){
   const el = document.getElementById('ordersList');
   if(!state.orders.length){ el.innerHTML = `<div class="empty">還沒有儲存的訂單</div>`; return; }
-  el.innerHTML = state.orders.map((o,i)=>{
+
+  // group by year-month, preserving original array index for edit/delete/toggle
+  const groups = [];
+  const groupMap = {};
+  state.orders.forEach((o,i)=>{
     const d = new Date(o.date);
-    const dstr = d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate();
-    return `<div class="order-card">
-      <div class="order-head" onclick="toggleOrder(${i})">
-        <div><div class="oname">${o.customer}</div><div class="odate">${dstr} · ${o.tier}${o.note? ' · '+o.note : ''}</div></div>
-        <div style="font-weight:900;color:var(--forest);">${fmt(o.profit)}</div>
-      </div>
-      <div class="order-stats">
-        <span>營收 <b>${fmt(o.rev)}</b></span><span>成本 <b>${fmt(o.cost)}</b></span>
-      </div>
-      <div class="order-detail" id="odetail-${i}">
-        ${o.items.map(it=>`<div class="line-nums" style="margin-top:4px;"><span>${it.name} ×${it.qty}</span><b>${fmt((it.unitRev-it.unitCost)*it.qty)}</b></div>`).join('')}
-        <div style="display:flex;gap:8px;margin-top:10px;">
-          <button class="btn btn-ghost" style="flex:1;" onclick="editOrder(${i})">編輯</button>
-          <button class="btn btn-ghost" style="flex:1;color:var(--brick);" onclick="deleteOrder(${i})">刪除</button>
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(!groupMap[key]){
+      const g = {key, label:d.getFullYear()+'年'+(d.getMonth()+1)+'月', items:[], rev:0, cost:0, profit:0};
+      groupMap[key] = g;
+      groups.push(g);
+    }
+    groupMap[key].items.push({o,i});
+    groupMap[key].rev += o.rev;
+    groupMap[key].cost += o.cost;
+    groupMap[key].profit += o.profit;
+  });
+  // default: most recent month expanded, rest collapsed (only set default once per key)
+  groups.forEach((g,gi)=>{
+    if(!(g.key in state.monthExpanded)) state.monthExpanded[g.key] = (gi===0);
+  });
+
+  el.innerHTML = groups.map(g=>{
+    const open = !!state.monthExpanded[g.key];
+    const cardsHtml = g.items.map(({o,i})=>{
+      const d = new Date(o.date);
+      const dstr = d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate();
+      return `<div class="order-card">
+        <div class="order-head" onclick="toggleOrder(${i})">
+          <div><div class="oname">${o.customer}</div><div class="odate">${dstr} · ${o.tier}${o.note? ' · '+o.note : ''}</div></div>
+          <div style="font-weight:900;color:var(--forest);">${fmt(o.profit)}</div>
         </div>
+        <div class="order-stats">
+          <span>營收 <b>${fmt(o.rev)}</b></span><span>成本 <b>${fmt(o.cost)}</b></span>
+        </div>
+        <div class="order-detail" id="odetail-${i}">
+          ${o.items.map(it=>`<div class="line-nums" style="margin-top:4px;"><span>${it.name} ×${it.qty}</span><b>${fmt((it.unitRev-it.unitCost)*it.qty)}</b></div>`).join('')}
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn btn-ghost" style="flex:1;" onclick="editOrder(${i})">編輯</button>
+            <button class="btn btn-ghost" style="flex:1;color:var(--brick);" onclick="deleteOrder(${i})">刪除</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="month-group">
+      <div class="month-head" onclick="toggleMonth('${g.key}')">
+        <div>
+          <div class="mtitle"><span class="arrow ${open?'open':''}">▸</span>${g.label}</div>
+          <div class="msub">${g.items.length} 筆訂單 · 營收 ${fmt(g.rev)}</div>
+        </div>
+        <div class="mprofit" style="color:${g.profit>=0?'#8FD9A8':'#F2A3A3'};">${fmt(g.profit)}</div>
       </div>
+      <div class="month-body ${open?'show':''}" id="mbody-${g.key}">${cardsHtml}</div>
     </div>`;
   }).join('');
 }
