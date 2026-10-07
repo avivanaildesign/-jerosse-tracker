@@ -1322,7 +1322,15 @@ function openStockAddModal(pid){
         ${avgCostLabel} ${fmt(avgCostVal)} · 估值 ${fmt(info.value)}
       </div>
     </div>
+    <div class="custom-form" style="padding:0;border:none;margin-bottom:14px;">
+      <div class="opt-label" style="margin-bottom:8px;">直接修改目前庫存</div>
+      <div class="row">
+        <input id="stkSetQty" type="number" value="${Math.trunc(info.remain/factor)}" placeholder="目前庫存（盒）">
+        <button class="btn btn-gold" onclick="confirmSetStock('${pid}')">更新庫存</button>
+      </div>
+    </div>
     <div class="custom-form" style="padding:0;border:none;">
+      <div class="opt-label" style="margin-bottom:8px;">或新增一筆進貨紀錄</div>
       <div class="row">
         <select id="stkSource" onchange="onStockModalSourceChange('${pid}')">
           <option value="線下叫貨">線下叫貨</option>
@@ -1370,6 +1378,20 @@ async function confirmAddStock(pid){
   const dateVal = document.getElementById('stkDate').value || todayStr();
   const note = document.getElementById('stkNote').value.trim();
   state.stockEntries.unshift({ id:Date.now(), pid, name:item.name, source, qty, unitCost, date:dateVal, note });
+  await saveStock();
+  closeModal();
+  renderStockTab();
+}
+async function confirmSetStock(pid){
+  const item = allInventoryItems().find(x=>x.id===pid);
+  const factor = pieceFactor(pid);
+  const info = stockInfoFor(pid);
+  const currentBoxes = Math.trunc(info.remain/factor);
+  const newBoxes = Number(document.getElementById('stkSetQty').value);
+  if(isNaN(newBoxes)){ alert('請輸入數字'); return; }
+  const delta = newBoxes - currentBoxes;
+  if(delta===0){ closeModal(); return; }
+  state.stockEntries.unshift({ id:Date.now(), pid, name:item.name, source:'庫存調整', qty:delta, unitCost:0, date:todayStr(), note:'直接設定庫存為 '+newBoxes });
   await saveStock();
   closeModal();
   renderStockTab();
