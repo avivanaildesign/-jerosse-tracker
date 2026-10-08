@@ -1226,8 +1226,9 @@ function computeStockMap(){
   state.stockEntries.forEach(e=>{
     const factor = pieceFactor(e.pid);
     const pieces = e.qty * factor;
-    if(!byPid[e.pid]) byPid[e.pid] = {qty:0, costValue:0};
+    if(!byPid[e.pid]) byPid[e.pid] = {qty:0, buyQty:0, costValue:0};
     byPid[e.pid].qty += pieces;
+    if(e.source!=='庫存調整') byPid[e.pid].buyQty += pieces;
     byPid[e.pid].costValue += e.qty*e.unitCost;
   });
   const soldMap = {};
@@ -1241,12 +1242,12 @@ function computeStockMap(){
 }
 function stockInfoFor(pid){
   const {byPid, soldMap} = computeStockMap();
-  const b = byPid[pid] || {qty:0, costValue:0};
+  const b = byPid[pid] || {qty:0, buyQty:0, costValue:0};
   const sold = soldMap[pid] || 0;
   const remain = b.qty - sold;
-  const avgCost = b.qty>0 ? b.costValue/b.qty : 0;
+  const avgCost = b.buyQty>0 ? b.costValue/b.buyQty : 0;
   const src = fifoRemainBySource(pid, sold);
-  return {inQty:b.qty, sold, remain, avgCost, value:remain*avgCost, offline:src.offline, online:src.online, promo:src.promo, adjust:src.adjust};
+  return {inQty:b.qty, sold, remain, avgCost, value:Math.max(remain,0)*avgCost, offline:src.offline, online:src.online, promo:src.promo, adjust:src.adjust};
 }
 const STOCK_CATS = [{id:'fiber',label:'纖體保健'},{id:'skin',label:'美肌'},{id:'custom',label:'自訂拆分商品'}];
 function initStockCatTabs(){
@@ -1258,7 +1259,15 @@ function initStockCatTabs(){
 }
 function formatStockQty(pieces, pid){
   const factor = pieceFactor(pid);
-  if(pieces<0) return {main: pieces+'件', unit:''}; // over-sold warning, keep raw piece count for clarity
+  if(pieces<0){
+    // over-sold (stock-in records are fewer than what was sold): show as negative boxes, not raw pieces
+    if(factor<=1) return {main: String(pieces), unit:''};
+    const abs = -pieces;
+    const nb = Math.floor(abs/factor);
+    const nr = abs - nb*factor;
+    if(nb===0) return {main: '-'+nr, unit:'件'};
+    return {main: '-'+nb, unit: nr>0 ? '盒 '+nr+'件' : '盒'};
+  }
   if(factor<=1) return {main: String(pieces), unit:''};
   const boxes = Math.floor(pieces/factor);
   const rem = pieces - boxes*factor;
