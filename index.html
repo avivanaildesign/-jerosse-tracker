@@ -292,6 +292,7 @@ input,select,textarea{font-size:16px;}
       <div class="d-lab">庫存總估值（依各批次實際成本）</div>
       <div class="d-val" id="stockTotalValue" style="font-size:24px;color:var(--gold);">$0</div>
     </div>
+    <div id="stockStartBox"></div>
     <button class="btn btn-gold btn-full" onclick="openCampaignCreate()">＋ 新增活動叫貨（買三送一）</button>
     <div id="campaignList"></div>
     <div class="cat-tabs" id="stockCatTabs" style="margin-top:14px;"></div>
@@ -456,7 +457,7 @@ function uid(){ const t = Date.now(); _u = t>_u ? t : _u+1; return _u; }
 let state = {
   tier:'二級輔導督導', target:null, cat:'fiber', tab:'new',
   cart:{lines:[], meta:null, editingOrderId:null},
-  orders:[], customSplits:[], stockEntries:[], stockMoves:[], campaigns:[],
+  orders:[], customSplits:[], stockEntries:[], stockMoves:[], campaigns:[], stockStart:'',
   stockCat:'fiber', monthExpanded:{}, panelOpen:false, extraOpen:false,
   perf:{mode:'month', year:null, month:null, from:null, listOpen:false},
   reportMode:'month', reportYear:null, reportMonth:null
@@ -472,6 +473,7 @@ function applyRemote(data){
   state.stockEntries = Array.isArray(data.stockEntries) ? data.stockEntries : [];
   state.stockMoves = Array.isArray(data.stockMoves) ? data.stockMoves : [];
   state.campaigns = Array.isArray(data.campaigns) ? data.campaigns : [];
+  state.stockStart = (typeof data.stockStart==='string') ? data.stockStart : '';
   if(data.tier) state.tier = data.tier;
   if(data.target) state.target = data.target;
 }
@@ -486,6 +488,7 @@ const saveTarget = ()=>fbSet('target', state.target);
 const saveStock = ()=>fbSet('stockEntries', state.stockEntries);
 const saveMoves = ()=>fbSet('stockMoves', state.stockMoves);
 const saveCampaigns = ()=>fbSet('campaigns', state.campaigns);
+const saveStockStart = ()=>fbSet('stockStart', state.stockStart||'');
 
 function renderAll(){
   initTierSelect(); initTargetSelect(); renderProducts();
@@ -641,8 +644,11 @@ function cloneLots(lots){ const o={}; Object.keys(lots).forEach(k=>{ o[k]=Object
 function computeLots(opt){
   opt = opt||{};
   const lots = {}, events = [], legacy = {}, over = {};
+  const start = state.stockStart || '';
+  const afterStart = d => !start || !d || d >= start;
   const addOver = (pid,p)=>{ over[pid]=(over[pid]||0)+p; };
   state.stockEntries.forEach(e=>{
+    if(!afterStart(e.date)) return;
     const loc = entryLoc(e), ppb = pieceFactor(e.pid);
     if(e.source==='庫存調整'){
       if(e.qty>=0){
@@ -658,9 +664,10 @@ function computeLots(opt){
     lots[key] = {key, lotId:e.id, pid:e.pid, loc, cost:e.unitCost||0, boxes:e.qty, packs:0, date:e.date||'', source:e.source,
       kind: e.kind || (e.source==='活動贈品轉入' ? 'gift' : 'purchase'), campaignId:e.campaignId};
   });
-  (state.stockMoves||[]).forEach(m=> events.push(Object.assign({seq:m.id}, m, {mtype:m.type, type:'move'})));
+  (state.stockMoves||[]).forEach(m=>{ if(afterStart(m.date)) events.push(Object.assign({seq:m.id}, m, {mtype:m.type, type:'move'})); });
   state.orders.forEach(o=>{
     if(o.id===opt.excludeOrderId) return;
+    if(!afterStart(orderDate(o))) return;
     const evLines = [];
     (o.items||[]).forEach(it=>{
       if(it.alloc) evLines.push(it);
@@ -1375,7 +1382,7 @@ function openCustomerDetail(idx){
 // ---------- BACKUP / RESTORE ----------
 function exportData(){
   const payload = {orders:state.orders, customSplits:state.customSplits, tier:state.tier, target:state.target,
-    stockEntries:state.stockEntries, stockMoves:state.stockMoves, campaigns:state.campaigns, exportedAt:new Date().toISOString()};
+    stockEntries:state.stockEntries, stockMoves:state.stockMoves, campaigns:state.campaigns, stockStart:state.stockStart||'', exportedAt:new Date().toISOString()};
   const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'}), url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = '婕樂纖收支備份_'+todayTW()+'.json';
   document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
@@ -1391,8 +1398,9 @@ async function handleImportFile(e){
     if(Array.isArray(p.stockEntries)) state.stockEntries = p.stockEntries;
     if(Array.isArray(p.stockMoves)) state.stockMoves = p.stockMoves;
     if(Array.isArray(p.campaigns)) state.campaigns = p.campaigns;
+    if(typeof p.stockStart==='string') state.stockStart = p.stockStart;
     if(p.tier) state.tier = p.tier; if(p.target) state.target = p.target;
-    await Promise.all([saveOrders(), saveCustomSplits(), saveStock(), saveMoves(), saveCampaigns(), saveTier(), saveTarget()]);
+    await Promise.all([saveStockStart(), saveOrders(), saveCustomSplits(), saveStock(), saveMoves(), saveCampaigns(), saveTier(), saveTarget()]);
     renderAll(); alert('匯入完成！');
   }catch(err){ alert('檔案格式不正確，匯入失敗'); }
   e.target.value = '';
@@ -1421,7 +1429,27 @@ function initStockCatTabs(){
 }
 function renderStockTab(){
   if(!document.getElementById('stockGrid')) return;
-  initStockCatTabs(); renderStockGrid(); renderCampaignList(); renderStockHistory();
+  renderStockStartBox(); initStockCatTabs(); renderStockGrid(); renderCampaignList(); renderStockHistory();
+}
+function renderStockStartBox(){
+  const el = document.getElementById('stockStartBox'); if(!el) return;
+  const st = state.stockStart || '', L = computeLots();
+  const overN = Object.keys(L.over).filter(k=>L.over[k]>0).length;
+  const oldOrders = st ? state.orders.filter(o=>orderDate(o)<st).length : 0;
+  const oldEntries = st ? state.stockEntries.filter(e=>e.date && e.date<st).length : 0;
+  let h = `<div class="dash-card" style="margin-bottom:12px;"><div class="opt-label">庫存起算日</div>`;
+  if(overN && !st) h += `<div class="notice">有 ${overN} 個商品顯示「待補登」：舊訂單賣出的量比你登記的進貨多。如果你已經實際盤點並登記好現有庫存，按下面「從今天起重新起算」，舊訂單就不會再扣掉新登記的庫存。</div>`;
+  h += `<div class="line-meta" style="margin:8px 0;line-height:1.6;">起算日以前的進貨和訂單，不會再影響庫存數量。訂單本身的營收、成本、利潤不受影響。起算日當天的進貨和訂單都會計入。</div>
+    <div class="custom-form" style="padding:0;border:none;"><div class="row"><input id="stockStartInput" type="date" value="${esc(st)}"><button class="btn btn-gold" onclick="setStockStart(document.getElementById('stockStartInput').value)">設定</button></div></div>
+    <div style="display:flex;gap:8px;margin-top:8px;"><button class="btn btn-ghost" style="flex:1;" onclick="setStockStart(todayTW())">從今天起重新起算</button>${st?`<button class="btn btn-ghost" style="flex:1;" onclick="setStockStart('')">取消起算日</button>`:''}</div>`;
+  if(st) h += `<div class="line-meta" style="margin-top:8px;">目前從 ${esc(st)} 起算：之前的 ${oldOrders} 筆訂單、${oldEntries} 筆進貨不計入庫存。</div>`;
+  el.innerHTML = h + `</div>`;
+}
+async function setStockStart(v){
+  v = v || '';
+  if(v && !confirm(v+' 以前的進貨和訂單將不再影響庫存。\n請確認你登記的進貨日期都在這天或之後。要設定嗎？')) return;
+  if(!v && !confirm('取消起算日後，所有歷史訂單都會重新扣庫存。要取消嗎？')) return;
+  state.stockStart = v; await saveStockStart(); renderStockTab(); renderProducts();
 }
 function renderStockGrid(){
   const L = computeLots(), items = allInventoryItems().filter(it=>it.cat===state.stockCat);
@@ -1522,9 +1550,9 @@ async function transferPrompt(lotId, from, to, pid){
 }
 function renderStockHistory(){
   const h = document.getElementById('stockHistory'), mv = document.getElementById('movesHistory'); if(!h) return;
-  h.innerHTML = state.stockEntries.length ? state.stockEntries.map(e=>`<div class="fixed-item" style="align-items:flex-start;" onclick="openEntryEdit(${e.id})">
+  h.innerHTML = state.stockEntries.length ? state.stockEntries.map(e=>`<div class="fixed-item" style="align-items:flex-start;${(state.stockStart && e.date && e.date<state.stockStart)?'opacity:.5;':''}" onclick="openEntryEdit(${e.id})">
     <div><div class="fname">${esc(e.name)}（${LOC_LABEL[entryLoc(e)]}・${esc(e.source)}）</div>
-    <div class="line-meta">${esc(e.date||'')} · 數量 ${e.qty} · 成本 ${fmtM(e.unitCost||0)}${e.note?' · '+esc(e.note):''}</div></div><span style="color:var(--ink-soft);">›</span></div>`).join('') : `<div class="empty">尚無進貨紀錄</div>`;
+    <div class="line-meta">${esc(e.date||'')} · 數量 ${e.qty} · 成本 ${fmtM(e.unitCost||0)}${e.note?' · '+esc(e.note):''}${(state.stockStart && e.date && e.date<state.stockStart)?' · 起算日前，不計入庫存':''}</div></div><span style="color:var(--ink-soft);">›</span></div>`).join('') : `<div class="empty">尚無進貨紀錄</div>`;
   mv.innerHTML = state.stockMoves.length ? state.stockMoves.map(m=>`<div class="fixed-item"><div><div class="fname">${m.type==='split'?'拆盒':'移轉'}・${esc(itemName(m.pid))}</div>
     <div class="line-meta">${esc(m.date||'')} · ${m.type==='split' ? LOC_LABEL[m.loc]+' 拆 '+m.boxes+' 盒' : LOC_LABEL[m.from]+' → '+LOC_LABEL[m.to]+' '+m.qty+(m.unit==='pack'?'包':'盒')}</div></div>
     <button class="line-del" onclick="event.stopPropagation();deleteMove(${m.id})">✕</button></div>`).join('') : `<div class="empty">尚無拆盒／移轉紀錄</div>`;
