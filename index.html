@@ -748,15 +748,23 @@ function campaignSoldGroups(cid, excludeOrderId){
   state.orders.forEach(o=>{ if(o.id===excludeOrderId) return; (o.items||[]).forEach(it=>{ if(it.kind==='campaign' && it.campaignId===cid) n+=it.qty; }); });
   return n;
 }
-function allocCampaign(lots, c, groups){
+function allocCampaign(lots, c, groups, loc){
   const alloc = []; let short = 0;
-  const take = (lotId, locs, need, unitCost)=>{
-    const list = Object.values(lots).filter(l=>l.lotId===lotId && locs.indexOf(l.loc)>-1).sort(byLot);
+  const take = (filter, need)=>{
+    const list = Object.values(lots).filter(filter).sort(byLot);
     for(const l of list){ if(need<=0) break; const t=Math.min(need, Math.max(l.boxes,0)); if(t>0){ alloc.push({key:l.key, unit:'box', qty:t, cost:l.cost, lotId:l.lotId, kind:l.kind}); l.boxes-=t; need-=t; } }
     return need;
   };
-  short += take(c.paidLotId, ['offline','online','pending'], groups*c.paidPer);
-  short += take(c.giftLotId, ['event'], groups*c.giftPer);
+  // 付費正貨：先扣這個活動自己的進貨批次，再扣同商品在所選庫存（線上/線下）的批次，先進先出
+  let need = groups*c.paidPer;
+  if(c.paidLotId) need = take(l=>l.lotId===c.paidLotId && l.loc===loc, need);
+  need = take(l=>l.pid===c.pid && l.loc===loc, need);
+  short += need;
+  // 贈品：活動保留區，成本照批次（通常 $0）
+  need = groups*c.giftPer;
+  if(c.giftLotId) need = take(l=>l.lotId===c.giftLotId && l.loc==='event', need);
+  need = take(l=>l.pid===c.pid && l.loc==='event', need);
+  short += need;
   return {alloc, short};
 }
 function calcFee(revenue, meta){
@@ -782,7 +790,7 @@ function calcCart(cart){
       else {
         const left = c.groups - campaignSoldGroups(c.id, cart.editingOrderId);
         if(ln.qty>left) out.issues.push({type:'campaignMax', i, left});
-        const a = allocCampaign(lots, c, ln.qty);
+        const a = allocCampaign(lots, c, ln.qty, loc);
         r.alloc = a.alloc; r.short = a.short;
         r.cost = round2(a.alloc.reduce((s,x)=>s+x.qty*x.cost,0));
         if(a.short>0) out.issues.push({type:'short', i, pid:c.pid, qty:a.short});
@@ -1483,6 +1491,8 @@ function openStockModal(pid){
     if(l.loc==='offline'||l.loc==='online'){
       if(ppb>1 && l.boxes>0) act += `<button class="mini" onclick="splitOne(${l.lotId},'${l.loc}','${q}')">拆1盒</button>`;
       act += `<button class="mini" onclick="transferPrompt(${l.lotId},'${l.loc}','${l.loc==='offline'?'online':'offline'}','${q}')">轉到${l.loc==='offline'?'線上':'線下'}</button>`;
+    } else if(l.loc==='event'){
+      act += `<button class="mini" onclick="transferPrompt(${l.lotId},'event','offline','${q}')">轉到線下</button><button class="mini" onclick="transferPrompt(${l.lotId},'event','online','${q}')">轉到線上</button>`;
     } else if(l.loc==='pending'){
       act += `<button class="mini" onclick="transferPrompt(${l.lotId},'pending','offline','${q}')">分入線下</button><button class="mini" onclick="transferPrompt(${l.lotId},'pending','online','${q}')">分入線上</button>`;
     }
@@ -1597,11 +1607,19 @@ async function deleteEntry(id){
 // ---------- COMPANY CAMPAIGNS (買三送一) ----------
 function renderCampaignList(){
   const el = document.getElementById('campaignList'); if(!el) return;
-  if(!state.campaigns.length){ el.innerHTML = ''; return; }
   const L = computeLots();
-  el.innerHTML = `<div class="section-title" style="margin-top:14px;">活動叫貨</div>` + state.campaigns.slice().reverse().map(c=>{
+  // 有「活動保留」庫存，卻沒有對應的進行中活動 → 提示補建
+  const adopt = [];
+  const byPid = {};
+  Object.values(L.lots).forEach(l=>{ if(l.loc==='event' && l.boxes>0) byPid[l.pid] = (byPid[l.pid]||0) + l.boxes; });
+  Object.keys(byPid).forEach(pid=>{ if(!state.campaigns.some(c=>!c.ended && c.pid===pid)) adopt.push(pid); });
+  const adoptHtml = adopt.length ? `<div class="section-title" style="margin-top:14px;">需要建立活動資料</div>` + adopt.map(pid=>`<div class="camp-card"><b>${esc(itemName(pid))}</b>
+    <div class="line-meta">庫存有「活動保留」${byPid[pid]} 盒，但還沒有活動資料，開單的「活動」頁籤會看不到。</div>
+    <button class="btn btn-gold btn-full" style="margin-top:8px;" onclick="openAdoptCampaign('${pid.replace(/'/g,"\\'")}')">建立活動資料（不會改動庫存）</button></div>`).join('') : '';
+  if(!state.campaigns.length){ el.innerHTML = adoptHtml; return; }
+  el.innerHTML = adoptHtml + `<div class="section-title" style="margin-top:14px;">活動叫貨</div>` + state.campaigns.slice().reverse().map(c=>{
     const sold = campaignSoldGroups(c.id, null);
-    const gl = L.lots[c.giftLotId+'|event'], gleft = gl ? gl.boxes : 0;
+    const gleft = Object.values(L.lots).filter(l=>l.pid===c.pid && l.loc==='event' && (!c.giftLotId || l.lotId===c.giftLotId)).reduce((s,l)=>s+l.boxes,0);
     return `<div class="camp-card ${c.ended?'ended':''}"><div style="display:flex;justify-content:space-between;"><b>${esc(c.name)}</b><span class="line-meta">${c.ended?'已結束 '+esc(c.endDate||''):'進行中'}</span></div>
       <div class="line-meta">${esc(itemName(c.pid))}・買${c.paidPer}送${c.giftPer}・叫貨 ${c.groups} 組（付費 ${c.groups*c.paidPer} 盒＋贈品 ${c.groups*c.giftPer} 盒）</div>
       <div class="line-meta">已賣 ${sold} 組・剩 ${c.groups-sold} 組・${c.ended?'':'未送出贈品 '+gleft+' 盒'}</div>
@@ -1641,9 +1659,11 @@ async function confirmCampaign(){
 }
 async function endCampaign(cid){
   const c = state.campaigns.find(x=>x.id===cid); if(!c) return;
-  const L = computeLots(), gl = L.lots[c.giftLotId+'|event'], rem = gl ? gl.boxes : 0;
+  const L = computeLots();
+  const glots = Object.values(L.lots).filter(l=>l.pid===c.pid && l.loc==='event' && l.boxes>0 && (!c.giftLotId || l.lotId===c.giftLotId));
+  const rem = glots.reduce((s,l)=>s+l.boxes,0);
   if(!confirm('結束「'+c.name+'」？'+(rem>0 ? '\n未送出的 '+rem+' 盒贈品會轉入線上可售庫存（成本維持 $0）。' : '')+'\n未賣出的付費正貨保留原進貨成本。')) return;
-  if(rem>0) state.stockMoves.unshift({id:uid(), type:'transfer', pid:c.pid, lotId:c.giftLotId, from:'event', to:'online', unit:'box', qty:rem, date:todayTW(), campaignId:cid});
+  glots.forEach(l=>state.stockMoves.unshift({id:uid(), type:'transfer', pid:c.pid, lotId:l.lotId, from:'event', to:'online', unit:'box', qty:l.boxes, date:todayTW(), campaignId:cid}));
   c.ended = true; c.endDate = todayTW();
   await Promise.all([saveMoves(), saveCampaigns()]); renderStockTab(); renderProducts();
 }
@@ -1652,6 +1672,29 @@ async function deleteCampaign(cid){
   state.campaigns = state.campaigns.filter(c=>c.id!==cid);
   state.stockEntries = state.stockEntries.filter(e=>e.campaignId!==cid);
   await Promise.all([saveStock(), saveCampaigns()]); renderStockTab(); renderProducts();
+}
+
+function openAdoptCampaign(pid){
+  const L = computeLots();
+  const rem = Object.values(L.lots).filter(l=>l.pid===pid && l.loc==='event').reduce((s,l)=>s+l.boxes,0);
+  document.getElementById('mName').textContent = '建立活動資料';
+  document.getElementById('mSpec').textContent = itemName(pid)+'・目前活動保留 '+rem+' 盒（庫存不會改動）';
+  document.getElementById('mBody').innerHTML = `<div class="custom-form" style="padding:0;border:none;">
+    <div class="fld-lab">活動名稱</div><div class="row"><input id="adName" value="${esc(itemName(pid))} 買三送一"></div>
+    <div class="row"><div style="flex:1;"><div class="fld-lab">這檔活動總組數</div><input id="adGroups" type="text" inputmode="numeric" value="${rem}"></div>
+    <div style="flex:1;"><div class="fld-lab">每組付費盒數</div><input id="adPaid" type="text" inputmode="numeric" value="3"></div>
+    <div style="flex:1;"><div class="fld-lab">每組贈送盒數</div><input id="adGift" type="text" inputmode="numeric" value="1"></div></div>
+    <div class="line-meta" style="margin-bottom:10px;line-height:1.6;">開單選這個活動時，每組會從你選的線上／線下庫存扣付費正貨，再從「活動保留」扣贈品。總組數是還可以賣的組數，賣到就不能再開。</div>
+    <button class="btn btn-gold btn-full" onclick="confirmAdoptCampaign('${pid.replace(/'/g,"\\'")}')">建立</button></div>`;
+  document.getElementById('mFooter').innerHTML = '';
+  document.getElementById('overlay').classList.add('show');
+}
+async function confirmAdoptCampaign(pid){
+  const name = document.getElementById('adName').value.trim();
+  const groups = parseInt(document.getElementById('adGroups').value)||0, paidPer = parseInt(document.getElementById('adPaid').value)||0, giftPer = parseInt(document.getElementById('adGift').value)||0;
+  if(!name || groups<=0 || paidPer<=0 || giftPer<=0){ alert('請填活動名稱、組數與每組盒數'); return; }
+  state.campaigns.push({id:'c'+uid(), name, pid, groups, paidPer, giftPer, date:todayTW(), paidLotId:null, giftLotId:null, ended:false});
+  await saveCampaigns(); closeModal(); renderStockTab(); renderProducts();
 }
 
 
