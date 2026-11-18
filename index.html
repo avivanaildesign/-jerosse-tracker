@@ -889,7 +889,13 @@ function renderProducts(){
   const sm = pid => stockSummary(L.lots, L.over, pid);
   if(state.cat==='campaign'){
     const act = state.campaigns.filter(c=>!c.ended);
-    if(!act.length){ area.innerHTML = `<div class="empty">目前沒有進行中的活動。到「庫存」頁按「新增活動叫貨」建立。</div>`; return; }
+    if(!act.length){
+      const hasEvent = Object.values(L.lots).some(l=>l.loc==='event' && l.boxes>0);
+      area.innerHTML = hasEvent
+        ? `<div class="empty" style="line-height:1.8;">庫存有「活動保留」的貨，但還沒建立活動資料，所以這裡看不到。<br><br><button class="btn btn-gold" onclick="switchTab('stock')">到庫存頁建立活動資料</button></div>`
+        : `<div class="empty">目前沒有進行中的活動。到「庫存」頁按「新增活動叫貨」建立。</div>`;
+      return;
+    }
     area.innerHTML = `<div class="section-title" style="margin-top:0;">進行中的活動（點選加入一組）</div><div class="grid">` + act.map(c=>{
       const left = c.groups - campaignSoldGroups(c.id, null);
       return `<div class="pcard" onclick="addCampaignLine('${c.id}')"><div class="pname">${esc(c.name)}</div>
@@ -1500,7 +1506,7 @@ function openStockModal(pid){
   }).join('') : `<div class="empty" style="padding:12px;">目前沒有庫存批次</div>`;
   h += `<div class="opt-label" style="margin-top:16px;">新增進貨</div><div class="custom-form" style="padding:0;border:none;">
     <div class="row"><select id="stkType" onchange="onStkType('${q}')"><option value="purchase">一般進貨（有成本）</option><option value="gift">活動贈品轉入（成本$0）</option></select>
-    <select id="stkLoc"><option value="offline">線下庫存</option><option value="online">線上庫存</option></select></div>
+    <select id="stkLoc"><option value="offline">線下庫存</option><option value="online">線上庫存</option><option value="event">活動保留區（贈品）</option></select></div>
     <div class="row"><input id="stkQty" type="text" inputmode="numeric" placeholder="${ppb>1?'數量（盒）':'數量'}"><input id="stkCost" type="text" inputmode="decimal" value="${dc!=null?dc:''}" placeholder="${dc==null?'請填實際成本':'每盒成本'}"></div>
     <div class="row"><input id="stkDate" type="date" value="${todayTW()}"><input id="stkNote" placeholder="備註（選填）"></div>
     <button class="btn btn-gold btn-full" onclick="confirmAddStock('${q}')">新增進貨</button></div>`;
@@ -1523,6 +1529,7 @@ async function confirmAddStock(pid){
   const raw = document.getElementById('stkCost').value.trim();
   if(type==='purchase' && (raw==='' || isNaN(Number(raw)))){ alert('請填實際進貨成本（一級價沒有提供的品項，要自己填）'); return; }
   const gift = type==='gift';
+  if(loc==='event' && !gift){ alert('「活動保留區」只能放活動贈品，請把類型改成「活動贈品轉入」'); return; }
   state.stockEntries.unshift({id:uid(), pid, name:itemName(pid), source: gift?'活動贈品轉入':(loc==='online'?'線上雲倉':'線下叫貨'), loc, qty,
     unitCost: gift?0:Number(raw), date:document.getElementById('stkDate').value||todayTW(), note:document.getElementById('stkNote').value.trim(), kind:gift?'gift':'purchase'});
   await saveStock(); closeModal(); renderStockTab(); renderProducts();
@@ -1619,11 +1626,12 @@ function renderCampaignList(){
   if(!state.campaigns.length){ el.innerHTML = adoptHtml; return; }
   el.innerHTML = adoptHtml + `<div class="section-title" style="margin-top:14px;">活動叫貨</div>` + state.campaigns.slice().reverse().map(c=>{
     const sold = campaignSoldGroups(c.id, null);
-    const gleft = Object.values(L.lots).filter(l=>l.pid===c.pid && l.loc==='event' && (!c.giftLotId || l.lotId===c.giftLotId)).reduce((s,l)=>s+l.boxes,0);
+    const gleft = campGiftLots(L, c).reduce((s,l)=>s+l.boxes,0);
     return `<div class="camp-card ${c.ended?'ended':''}"><div style="display:flex;justify-content:space-between;"><b>${esc(c.name)}</b><span class="line-meta">${c.ended?'已結束 '+esc(c.endDate||''):'進行中'}</span></div>
       <div class="line-meta">${esc(itemName(c.pid))}・買${c.paidPer}送${c.giftPer}・叫貨 ${c.groups} 組（付費 ${c.groups*c.paidPer} 盒＋贈品 ${c.groups*c.giftPer} 盒）</div>
       <div class="line-meta">已賣 ${sold} 組・剩 ${c.groups-sold} 組・${c.ended?'':'未送出贈品 '+gleft+' 盒'}</div>
       <div style="display:flex;gap:8px;margin-top:8px;">${c.ended?'':`<button class="btn btn-ghost" style="flex:1;" onclick="endCampaign('${c.id}')">結束活動</button>`}
+      ${c.ended?'':`<button class="btn btn-ghost" style="flex:1;" onclick="openCampaignTopup('${c.id}')">追加組數</button>`}
       ${sold===0?`<button class="btn btn-ghost" style="flex:1;color:var(--brick);" onclick="deleteCampaign('${c.id}')">刪除</button>`:''}</div></div>`;
   }).join('');
 }
@@ -1660,7 +1668,7 @@ async function confirmCampaign(){
 async function endCampaign(cid){
   const c = state.campaigns.find(x=>x.id===cid); if(!c) return;
   const L = computeLots();
-  const glots = Object.values(L.lots).filter(l=>l.pid===c.pid && l.loc==='event' && l.boxes>0 && (!c.giftLotId || l.lotId===c.giftLotId));
+  const glots = campGiftLots(L, c).filter(l=>l.boxes>0);
   const rem = glots.reduce((s,l)=>s+l.boxes,0);
   if(!confirm('結束「'+c.name+'」？'+(rem>0 ? '\n未送出的 '+rem+' 盒贈品會轉入線上可售庫存（成本維持 $0）。' : '')+'\n未賣出的付費正貨保留原進貨成本。')) return;
   glots.forEach(l=>state.stockMoves.unshift({id:uid(), type:'transfer', pid:c.pid, lotId:l.lotId, from:'event', to:'online', unit:'box', qty:l.boxes, date:todayTW(), campaignId:cid}));
@@ -1695,6 +1703,40 @@ async function confirmAdoptCampaign(pid){
   if(!name || groups<=0 || paidPer<=0 || giftPer<=0){ alert('請填活動名稱、組數與每組盒數'); return; }
   state.campaigns.push({id:'c'+uid(), name, pid, groups, paidPer, giftPer, date:todayTW(), paidLotId:null, giftLotId:null, ended:false});
   await saveCampaigns(); closeModal(); renderStockTab(); renderProducts();
+}
+
+function campGiftLots(L, c){
+  return Object.values(L.lots).filter(l=>l.pid===c.pid && l.loc==='event' && (!c.giftLotId || l.lotId===c.giftLotId || l.campaignId===c.id));
+}
+function openCampaignTopup(cid){
+  const c = state.campaigns.find(x=>x.id===cid); if(!c) return;
+  const paidEntry = state.stockEntries.find(e=>c.paidLotId && e.id===c.paidLotId) || state.stockEntries.find(e=>e.campaignId===cid && e.kind==='purchase');
+  const cost = paidEntry ? paidEntry.unitCost : defaultCostFor(c.pid);
+  const sold = campaignSoldGroups(c.id, null);
+  document.getElementById('mName').textContent = '追加組數';
+  document.getElementById('mSpec').textContent = c.name+'・目前總 '+c.groups+' 組，已賣 '+sold+' 組，剩 '+(c.groups-sold)+' 組';
+  document.getElementById('mBody').innerHTML = `<div class="custom-form" style="padding:0;border:none;">
+    <div class="fld-lab">追加幾組（每組付費 ${c.paidPer} 盒＋贈品 ${c.giftPer} 盒）</div><div class="row"><input id="tuGroups" type="text" inputmode="numeric" placeholder="例如 5"></div>
+    <div class="fld-lab">付費正貨</div><div class="row"><select id="tuPaidMode"><option value="add">一起入庫</option><option value="none">已另外登記進貨，不用再入</option></select></div>
+    <div class="row"><div style="flex:1;"><div class="fld-lab">每盒實際成本</div><input id="tuCost" type="text" inputmode="decimal" value="${cost!=null?cost:''}"></div>
+    <div style="flex:1;"><div class="fld-lab">放哪裡</div><select id="tuLoc"><option value="offline">線下庫存</option><option value="online">線上庫存</option></select></div></div>
+    <div class="fld-lab">贈品（成本 $0，放活動保留區）</div><div class="row"><select id="tuGiftMode"><option value="add">一起入庫</option><option value="none">已另外登記，不用再入</option></select></div>
+    <div class="fld-lab">日期</div><div class="row"><input id="tuDate" type="date" value="${todayTW()}"></div>
+    <button class="btn btn-gold btn-full" onclick="confirmTopup('${c.id}')">追加</button></div>`;
+  document.getElementById('mFooter').innerHTML = '';
+  document.getElementById('overlay').classList.add('show');
+}
+async function confirmTopup(cid){
+  const c = state.campaigns.find(x=>x.id===cid); if(!c) return;
+  const n = parseInt(document.getElementById('tuGroups').value)||0;
+  if(n<=0){ alert('請輸入要追加的組數'); return; }
+  const paidMode = document.getElementById('tuPaidMode').value, giftMode = document.getElementById('tuGiftMode').value;
+  const raw = document.getElementById('tuCost').value.trim(), loc = document.getElementById('tuLoc').value, date = document.getElementById('tuDate').value || todayTW();
+  if(paidMode==='add' && (raw==='' || isNaN(Number(raw)))){ alert('請填付費正貨的實際每盒成本'); return; }
+  if(giftMode==='add' && c.giftPer>0) state.stockEntries.unshift({id:uid(), pid:c.pid, name:itemName(c.pid), source:'活動贈品轉入', loc:'event', qty:n*c.giftPer, unitCost:0, date, note:'活動追加贈品：'+c.name, kind:'gift', campaignId:cid});
+  if(paidMode==='add') state.stockEntries.unshift({id:uid(), pid:c.pid, name:itemName(c.pid), source:loc==='online'?'線上雲倉':'線下叫貨', loc, qty:n*c.paidPer, unitCost:Number(raw), date, note:'活動追加：'+c.name, kind:'purchase', campaignId:cid});
+  c.groups += n;
+  await Promise.all([saveStock(), saveCampaigns()]); closeModal(); renderStockTab(); renderProducts();
 }
 
 
