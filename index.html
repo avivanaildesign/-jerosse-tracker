@@ -654,7 +654,7 @@ function computeLots(opt){
       if(e.qty>=0){
         const c = avgPurchaseCost(e.pid);
         const key = e.id+'|'+loc;
-        lots[key] = {key, lotId:e.id, pid:e.pid, loc, cost:(c==null?(defaultCostFor(e.pid)||0):c), boxes:e.qty, packs:0, date:e.date||'', source:e.source, kind:'adjust'};
+        lots[key] = {key, lotId:e.id, pid:e.pid, loc, cost:(loc==='event' ? 0 : (c==null?(defaultCostFor(e.pid)||0):c)), boxes:e.qty, packs:0, date:e.date||'', source:e.source, kind:(loc==='event'?'gift':'adjust')};
       } else if(loc==='pending'){ legacy[e.pid]=(legacy[e.pid]||0) + (-e.qty)*ppb; }
       else events.push({seq:e.id, type:'adjNeg', pid:e.pid, loc, boxes:-e.qty});
       return;
@@ -1512,7 +1512,8 @@ function openStockModal(pid){
     <button class="btn btn-gold btn-full" onclick="confirmAddStock('${q}')">新增進貨</button></div>`;
   h += `<div class="opt-label" style="margin-top:16px;">盤點修正（填現場實際整盒數，系統補差額）</div><div class="custom-form" style="padding:0;border:none;">
     <div class="row"><div style="flex:1;"><div class="fld-lab">線下 盒</div><input id="cnt-offline" type="text" inputmode="numeric" value="${locCount(L,pid,'offline')}"></div>
-    <div style="flex:1;"><div class="fld-lab">線上 盒</div><input id="cnt-online" type="text" inputmode="numeric" value="${locCount(L,pid,'online')}"></div></div>
+    <div style="flex:1;"><div class="fld-lab">線上 盒</div><input id="cnt-online" type="text" inputmode="numeric" value="${locCount(L,pid,'online')}"></div>
+    <div style="flex:1;"><div class="fld-lab">活動保留 盒</div><input id="cnt-event" type="text" inputmode="numeric" value="${locCount(L,pid,'event')}"></div></div>
     <button class="btn btn-ghost btn-full" onclick="confirmCount('${q}')">更新庫存</button></div>`;
   document.getElementById('mBody').innerHTML = h;
   document.getElementById('mFooter').innerHTML = '';
@@ -1536,11 +1537,12 @@ async function confirmAddStock(pid){
 }
 async function confirmCount(pid){
   const L = computeLots(), made = [];
-  ['offline','online'].forEach(loc=>{
-    const v = document.getElementById('cnt-'+loc).value.trim();
+  ['offline','online','event'].forEach(loc=>{
+    const el = document.getElementById('cnt-'+loc); if(!el) return;
+    const v = el.value.trim();
     if(v==='' || isNaN(Number(v))) return;
     const delta = Math.round(Number(v)) - locCount(L,pid,loc);
-    if(delta!==0) made.push({id:uid(), pid, name:itemName(pid), source:'庫存調整', loc, qty:delta, unitCost:0, date:todayTW(), note:'盤點修正為 '+Number(v)+' 盒', kind:'adjust'});
+    if(delta!==0) made.push({id:uid(), pid, name:itemName(pid), source:'庫存調整', loc, qty:delta, unitCost:0, date:todayTW(), note:'盤點修正為 '+Number(v)+' 盒', kind:(loc==='event'?'gift':'adjust')});
   });
   if(!made.length){ closeModal(); return; }
   made.forEach(e=>state.stockEntries.unshift(e));
@@ -1631,7 +1633,7 @@ function renderCampaignList(){
       <div class="line-meta">${esc(itemName(c.pid))}・買${c.paidPer}送${c.giftPer}・叫貨 ${c.groups} 組（付費 ${c.groups*c.paidPer} 盒＋贈品 ${c.groups*c.giftPer} 盒）</div>
       <div class="line-meta">已賣 ${sold} 組・剩 ${c.groups-sold} 組・${c.ended?'':'未送出贈品 '+gleft+' 盒'}</div>
       <div style="display:flex;gap:8px;margin-top:8px;">${c.ended?'':`<button class="btn btn-ghost" style="flex:1;" onclick="endCampaign('${c.id}')">結束活動</button>`}
-      ${c.ended?'':`<button class="btn btn-ghost" style="flex:1;" onclick="openCampaignTopup('${c.id}')">追加組數</button>`}
+      ${c.ended?'':`<button class="btn btn-ghost" style="flex:1;" onclick="openCampaignTopup('${c.id}')">追加組數</button><button class="btn btn-ghost" style="flex:1;" onclick="editCampaignGroups('${c.id}')">改總組數</button>`}
       ${sold===0?`<button class="btn btn-ghost" style="flex:1;color:var(--brick);" onclick="deleteCampaign('${c.id}')">刪除</button>`:''}</div></div>`;
   }).join('');
 }
@@ -1737,6 +1739,16 @@ async function confirmTopup(cid){
   if(paidMode==='add') state.stockEntries.unshift({id:uid(), pid:c.pid, name:itemName(c.pid), source:loc==='online'?'線上雲倉':'線下叫貨', loc, qty:n*c.paidPer, unitCost:Number(raw), date, note:'活動追加：'+c.name, kind:'purchase', campaignId:cid});
   c.groups += n;
   await Promise.all([saveStock(), saveCampaigns()]); closeModal(); renderStockTab(); renderProducts();
+}
+
+async function editCampaignGroups(cid){
+  const c = state.campaigns.find(x=>x.id===cid); if(!c) return;
+  const sold = campaignSoldGroups(c.id, null);
+  const v = prompt('「'+c.name+'」可賣的總組數是多少？（已賣 '+sold+' 組）', String(c.groups));
+  if(v===null) return;
+  const n = parseInt(v);
+  if(isNaN(n) || n<sold){ alert('總組數不能小於已賣的 '+sold+' 組'); return; }
+  c.groups = n; await saveCampaigns(); renderStockTab(); renderProducts();
 }
 
 
