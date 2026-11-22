@@ -809,20 +809,21 @@ function calcCart(cart){
       }
     } else if(isStockKind(ln.kind) && ln.pid && !ln.legacy){
       const unit = lineUnit(ln);
+      const useLoc = (ln.src==='event') ? 'event' : loc;
       let a = null;
-      if(ln.savedAlloc && ln.savedSig===sigOf(ln,loc) && ln.savedAlloc.every(x=>x.key)){
+      if(ln.savedAlloc && ln.savedSig===sigOf(ln,useLoc) && ln.savedAlloc.every(x=>x.key)){
         const field = u=>u==='pack'?'packs':'boxes';
         const ok = ln.savedAlloc.every(x=>lots[x.key] && lots[x.key][field(x.unit)]>=x.qty);
         if(ok){ ln.savedAlloc.forEach(x=>{ lots[x.key][field(x.unit)] -= x.qty; }); a = {alloc:ln.savedAlloc.map(x=>Object.assign({},x)), short:0}; }
       }
-      if(!a) a = allocUnits(lots, ln.pid, unit, ln.qty, loc, ln.lotPref);
+      if(!a) a = allocUnits(lots, ln.pid, unit, ln.qty, useLoc, ln.lotPref);
       r.alloc = a.alloc; r.short = a.short;
       let cost = a.alloc.reduce((s,x)=>s+x.qty*x.cost,0);
       if(a.short>0){
         const fb = fallbackUnitCost(ln.pid, unit);
         cost += a.short*fb;
         r.alloc = r.alloc.concat([{key:'', unit, qty:a.short, cost:fb}]);
-        const boxesLeft = Object.values(lots).filter(l=>l.pid===ln.pid && l.loc===loc && l.boxes>0).length>0;
+        const boxesLeft = useLoc!=='event' && Object.values(lots).filter(l=>l.pid===ln.pid && l.loc===useLoc && l.boxes>0).length>0;
         out.issues.push({type:(unit==='pack' && boxesLeft)?'packShort':'short', i, pid:ln.pid, qty:a.short});
       }
       r.cost = round2(cost);
@@ -920,7 +921,7 @@ function renderProducts(){
     const mode = state.cat, label = mode==='self' ? '自用' : '贈品';
     area.innerHTML = `<div class="section-title" style="margin-top:0;">挑選${label}商品（成本依扣到的庫存批次計算）</div><div class="grid">` +
       PRODUCTS.map(p=>`<div class="pcard" onclick="openGiftModal('${p.id}','${mode}')"><div class="pname">${p.name}</div>
-        <div class="pspec">${p.spec}</div><div class="pcost">${stockText(sm(p.id), pieceFactor(p.id))}</div></div>`).join('') + `</div>` +
+        <div class="pspec">${p.spec}</div><div class="pcost">${stockText(sm(p.id), pieceFactor(p.id))}${sm(p.id).event.boxes>0?' 活動保留'+sm(p.id).event.boxes:''}</div></div>`).join('') + `</div>` +
       (state.customSplits.length ? `<div class="section-title">我的自訂拆分商品</div><div class="grid">` +
         state.customSplits.map(c=>`<div class="pcard" onclick="openGiftModal('cs:${esc(c.name)}','${mode}')"><div class="pname">${esc(c.name)}</div>
         <div class="pspec">每份成本 ${fmt(c.boxCost/c.units)}</div><div class="pcost">${stockText(sm('cs:'+c.name),1)}</div></div>`).join('') + `</div>` : '');
@@ -940,7 +941,7 @@ function renderProducts(){
 
 // ---------- ADD LINES ----------
 function addLine(ln){
-  const ex = (ln.kind==='fixed'||ln.kind==='custom') ? null : state.cart.lines.find(x=>x.kind===ln.kind && x.pid===ln.pid && lineUnit(x)===lineUnit(ln) && x.label===ln.label && x.campaignId===ln.campaignId);
+  const ex = (ln.kind==='fixed'||ln.kind==='custom') ? null : state.cart.lines.find(x=>x.kind===ln.kind && x.pid===ln.pid && lineUnit(x)===lineUnit(ln) && x.label===ln.label && x.campaignId===ln.campaignId && (x.src||null)===(ln.src||null));
   if(ex) ex.qty += ln.qty; else state.cart.lines.push(ln);
   updateCartUI();
   if(state.cat==='fiber'||state.cat==='skin') renderProducts();
@@ -957,25 +958,33 @@ function addCampaignLine(cid){
   addLine({pid:c.pid, name:c.name+'（買'+c.paidPer+'送'+c.giftPer+'）', kind:'campaign', campaignId:cid, qty:1, unitRev:pr!=null ? pr*c.paidPer : 0, unit:'box',
     mixList:pids.map((p,k)=>({pid:p, n:k===0 ? c.paidPer+c.giftPer : 0})), giftPid:null});
 }
-let giftUnit = 'box';
+let giftUnit = 'box', giftSrc = '';
 function openGiftModal(pid, mode){
   const label = mode==='self' ? '自用' : '贈品';
-  const ppb = pieceFactor(pid); giftUnit = 'box';
+  const ppb = pieceFactor(pid); giftUnit = 'box'; giftSrc = '';
+  const L = computeLots(), sm = stockSummary(L.lots, L.over, pid);
   document.getElementById('mName').textContent = itemName(pid)+'（'+label+'）';
   document.getElementById('mSpec').textContent = '成本依扣到的庫存批次計算，不計營收';
   document.getElementById('mBody').innerHTML =
-    (ppb>1 ? `<div class="seg" style="margin-bottom:12px;"><button id="gu-box" class="on" onclick="setGiftUnit('box')">整盒</button><button id="gu-pack" onclick="setGiftUnit('pack')">單包</button></div>` : '') +
+    `<div class="opt-label">扣貨來源</div><div class="seg" style="margin-bottom:12px;"><button id="gs-norm" class="on" onclick="setGiftSrc('')">一般庫存（依訂單選的線下／線上）</button><button id="gs-event" onclick="setGiftSrc('event')">活動保留（贈品 ${sm.event.boxes} 盒）</button></div>` +
+    (ppb>1 ? `<div id="gu-wrap" class="seg" style="margin-bottom:12px;"><button id="gu-box" class="on" onclick="setGiftUnit('box')">整盒</button><button id="gu-pack" onclick="setGiftUnit('pack')">單包</button></div>` : '') +
     `<div class="opt-label">數量</div><input id="giftQty" type="text" inputmode="numeric" value="1" style="width:100%;padding:12px;font-size:16px;border:1px solid var(--line);border-radius:10px;margin-bottom:12px;">
      <button class="btn btn-gold btn-full" onclick="confirmGift('${pid.replace(/'/g,"\\'")}','${mode}')">加入訂單</button>`;
   document.getElementById('mFooter').innerHTML = '';
   document.getElementById('overlay').classList.add('show');
+}
+function setGiftSrc(src){
+  giftSrc = src;
+  document.getElementById('gs-norm').classList.toggle('on', !src); document.getElementById('gs-event').classList.toggle('on', !!src);
+  const w = document.getElementById('gu-wrap'); if(w){ w.style.display = src ? 'none' : 'flex'; }
+  if(src) giftUnit = 'box';
 }
 function setGiftUnit(u){ giftUnit = u; document.getElementById('gu-box').classList.toggle('on',u==='box'); document.getElementById('gu-pack').classList.toggle('on',u==='pack'); }
 function confirmGift(pid, mode){
   const qty = Math.max(1, parseInt(document.getElementById('giftQty').value)||1);
   const label = mode==='self' ? '自用' : '贈品';
   closeModal();
-  addLine({pid, name:itemName(pid)+'（'+label+'）', kind:mode, qty, unitRev:0, unit:giftUnit, lotPref:null});
+  addLine({pid, name:itemName(pid)+'（'+label+(giftSrc?'・活動贈品':'')+'）', kind:mode, qty, unitRev:0, unit:giftUnit, lotPref:null, src:giftSrc||null});
 }
 function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
 function addFixedToCart(i){
@@ -1037,6 +1046,7 @@ function setUnit(i,u){
   }
   l.unit = u; l.lotPref = null; l.savedAlloc = null; updateCartUI();
 }
+function setSrc(i,v){ const l = state.cart.lines[i]; l.src = v||null; if(v){ l.unit = 'box'; } l.lotPref = null; l.savedAlloc = null; updateCartUI(); }
 function setLoc(loc){
   const m = state.cart.meta; m.loc = loc; m.splitReq = {};
   state.cart.lines.forEach(l=>{ l.lotPref = null; l.savedAlloc = null; });
@@ -1067,7 +1077,7 @@ function removeSplit(pid){ const r = state.cart.meta.splitReq; r[pid] = (r[pid]|
 
 // lot picker
 function openLotPicker(i){
-  const ln = state.cart.lines[i], loc = state.cart.meta.loc;
+  const ln = state.cart.lines[i], loc = (ln.src==='event') ? 'event' : state.cart.meta.loc;
   const base = computeLots({excludeOrderId: state.cart.editingOrderId});
   const ppb = pieceFactor(ln.pid);
   const lots = Object.values(base.lots).filter(l=>l.pid===ln.pid && l.loc===loc && (l.boxes>0||l.packs>0)).sort(byLot);
@@ -1111,12 +1121,13 @@ function renderOrderLine(ln, i, r, c){
   } else {
     h += `<div class="ol-row">`;
     if(ln.kind==='campaign') h += `<span class="ol-unit">組</span>`;
-    else if(ppb>1) h += `<div class="useg"><button class="${unit==='box'?'on':''}" onclick="setUnit(${i},'box')">${p?esc(specUnit(p)||'盒'):'盒'}</button><button class="${unit==='pack'?'on':''}" onclick="setUnit(${i},'pack')">單包</button></div>`;
+    else if(ppb>1 && ln.src!=='event') h += `<div class="useg"><button class="${unit==='box'?'on':''}" onclick="setUnit(${i},'box')">${p?esc(specUnit(p)||'盒'):'盒'}</button><button class="${unit==='pack'?'on':''}" onclick="setUnit(${i},'pack')">單包</button></div>`;
     else h += `<span class="ol-unit">${p?esc(specUnit(p)):'件'}</span>`;
     h += `<div class="stepper"><button onclick="stepQty(${i},-1)">－</button><input type="text" inputmode="numeric" value="${ln.qty}" onchange="setQty(${i},this.value)"><button onclick="stepQty(${i},1)">＋</button></div>`;
     if(!isFree) h += `<div class="pricebox">$<input type="text" inputmode="decimal" value="${ln.unitRev||0}" oninput="setPrice(${i},this.value)"></div>`;
     h += `</div>`;
     if(ln.pid && ln.kind!=='campaign' && !ln.legacy){
+      if(isFree) h += `<div class="ol-row" style="margin-top:6px;"><span class="ol-sub" style="flex:1;margin:0;">扣貨來源</span><select onchange="setSrc(${i},this.value)" style="padding:8px;border:1px solid var(--line);border-radius:8px;"><option value="">一般庫存（${LOC_LABEL[state.cart.meta.loc]}）</option><option value="event" ${ln.src==='event'?'selected':''}>活動保留（贈品）</option></select></div>`;
       h += `<div class="ol-sub">扣貨：${allocText(r) || '—'} <button class="mini" onclick="openLotPicker(${i})">批次</button></div>`;
     } else if(ln.kind==='campaign'){
       const cp = state.campaigns.find(x=>x.id===ln.campaignId), pids = cp ? campPids(cp) : [];
@@ -1207,6 +1218,7 @@ function buildSavedLine(ln, r){
   if(ln.campaignId) o.campaignId = ln.campaignId;
   if(ln.mixList) o.mixList = ln.mixList.map(m=>({pid:m.pid, n:m.n}));
   if(ln.giftPid) o.giftPid = ln.giftPid;
+  if(ln.src) o.src = ln.src;
   if(ln.pid){ o.unit = unit; o.unitType = unit==='pack' ? 'piece' : 'box'; }
   if(r.alloc && !ln.legacy){
     o.alloc = r.alloc.map(a=>({key:a.key||'', unit:a.unit, qty:a.qty, cost:a.cost, lotId:a.lotId||null, kind:a.kind||null, pid:a.pid||null}));
