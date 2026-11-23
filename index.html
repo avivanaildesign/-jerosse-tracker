@@ -617,6 +617,13 @@ function avgPurchaseCost(pid){
   });
   return q>0 ? c/q : null;
 }
+// 活動攤提成本：付費正貨的成本，攤到「付費＋贈品」所有盒子上（買三送一 → 每盒 = 付費成本 × 3/4）
+function shareCostFor(pid){
+  const c = (state.campaigns||[]).filter(x=>!x.ended && campPids(x).indexOf(pid)>-1)[0];
+  const paidPer = c ? c.paidPer : 3, giftPer = c ? c.giftPer : 1;
+  let base = avgPurchaseCost(pid); if(base==null) base = defaultCostFor(pid); if(base==null) base = 0;
+  return round2(base*paidPer/(paidPer+giftPer));
+}
 function fallbackUnitCost(pid, unit){
   let c = avgPurchaseCost(pid);
   if(c==null) c = defaultCostFor(pid);
@@ -827,6 +834,10 @@ function calcCart(cart){
         out.issues.push({type:(unit==='pack' && boxesLeft)?'packShort':'short', i, pid:ln.pid, qty:a.short});
       }
       r.cost = round2(cost);
+      if(ln.src==='event' && (ln.costMode==='share' || ln.costMode==='custom')){
+        const per = ln.costMode==='custom' ? (Number(ln.customCost)||0) : shareCostFor(ln.pid);
+        r.cost = round2(per*ln.qty);
+      }
     } else if(ln.legacy){
       r.cost = (ln.unitCost||0)*ln.qty;
     } else {
@@ -1046,7 +1057,9 @@ function setUnit(i,u){
   }
   l.unit = u; l.lotPref = null; l.savedAlloc = null; updateCartUI();
 }
-function setSrc(i,v){ const l = state.cart.lines[i]; l.src = v||null; if(v){ l.unit = 'box'; } l.lotPref = null; l.savedAlloc = null; updateCartUI(); }
+function setCostMode(i,v){ const l = state.cart.lines[i]; l.costMode = v||null; updateCartUI(); }
+function setCustomCost(i,v){ state.cart.lines[i].customCost = Number(v)||0; updateTotalsOnly(); }
+function setSrc(i,v){ const l = state.cart.lines[i]; l.src = v||null; if(!v){ l.costMode = null; } if(v){ l.unit = 'box'; } l.lotPref = null; l.savedAlloc = null; updateCartUI(); }
 function setLoc(loc){
   const m = state.cart.meta; m.loc = loc; m.splitReq = {};
   state.cart.lines.forEach(l=>{ l.lotPref = null; l.savedAlloc = null; });
@@ -1128,6 +1141,12 @@ function renderOrderLine(ln, i, r, c){
     h += `</div>`;
     if(ln.pid && ln.kind!=='campaign' && !ln.legacy){
       if(isFree) h += `<div class="ol-row" style="margin-top:6px;"><span class="ol-sub" style="flex:1;margin:0;">扣貨來源</span><select onchange="setSrc(${i},this.value)" style="padding:8px;border:1px solid var(--line);border-radius:8px;"><option value="">一般庫存（${LOC_LABEL[state.cart.meta.loc]}）</option><option value="event" ${ln.src==='event'?'selected':''}>活動保留（贈品）</option></select></div>`;
+      if(isFree && ln.src==='event'){
+        const sh = shareCostFor(ln.pid);
+        h += `<div class="ol-row" style="margin-top:6px;"><span class="ol-sub" style="flex:1;margin:0;">成本算法</span><select onchange="setCostMode(${i},this.value)" style="padding:8px;border:1px solid var(--line);border-radius:8px;">
+          <option value="">贈品成本 $0</option><option value="share" ${ln.costMode==='share'?'selected':''}>活動攤提成本 ${fmtM(sh)}／盒</option><option value="custom" ${ln.costMode==='custom'?'selected':''}>自訂每盒成本</option></select></div>`;
+        if(ln.costMode==='custom') h += `<div class="pricebox" style="margin-top:6px;width:170px;">每盒 $<input type="text" inputmode="decimal" value="${ln.customCost||''}" placeholder="0" oninput="setCustomCost(${i},this.value)"></div>`;
+      }
       h += `<div class="ol-sub">扣貨：${allocText(r) || '—'} <button class="mini" onclick="openLotPicker(${i})">批次</button></div>`;
     } else if(ln.kind==='campaign'){
       const cp = state.campaigns.find(x=>x.id===ln.campaignId), pids = cp ? campPids(cp) : [];
@@ -1219,6 +1238,7 @@ function buildSavedLine(ln, r){
   if(ln.mixList) o.mixList = ln.mixList.map(m=>({pid:m.pid, n:m.n}));
   if(ln.giftPid) o.giftPid = ln.giftPid;
   if(ln.src) o.src = ln.src;
+  if(ln.costMode){ o.costMode = ln.costMode; if(ln.costMode==='custom') o.customCost = ln.customCost||0; }
   if(ln.pid){ o.unit = unit; o.unitType = unit==='pack' ? 'piece' : 'box'; }
   if(r.alloc && !ln.legacy){
     o.alloc = r.alloc.map(a=>({key:a.key||'', unit:a.unit, qty:a.qty, cost:a.cost, lotId:a.lotId||null, kind:a.kind||null, pid:a.pid||null}));
