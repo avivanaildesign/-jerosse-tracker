@@ -952,7 +952,7 @@ function renderProducts(){
 
 // ---------- ADD LINES ----------
 function addLine(ln){
-  const ex = (ln.kind==='fixed'||ln.kind==='custom') ? null : state.cart.lines.find(x=>x.kind===ln.kind && x.pid===ln.pid && lineUnit(x)===lineUnit(ln) && x.label===ln.label && x.campaignId===ln.campaignId && (x.src||null)===(ln.src||null));
+  const ex = (ln.kind==='fixed'||ln.kind==='custom'||ln.kind==='campaign') ? null : state.cart.lines.find(x=>x.kind===ln.kind && x.pid===ln.pid && lineUnit(x)===lineUnit(ln) && x.label===ln.label && x.campaignId===ln.campaignId && (x.src||null)===(ln.src||null));
   if(ex) ex.qty += ln.qty; else state.cart.lines.push(ln);
   updateCartUI();
   if(state.cat==='fiber'||state.cat==='skin') renderProducts();
