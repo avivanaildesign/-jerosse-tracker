@@ -912,7 +912,7 @@ function renderProducts(){
   const L = computeLots();
   const sm = pid => stockSummary(L.lots, L.over, pid);
   if(state.cat==='campaign'){
-    const act = state.campaigns.filter(c=>!c.ended);
+    const act = state.campaigns.filter(c=>!c.ended && !c.archived);
     if(!act.length){
       const hasEvent = Object.values(L.lots).some(l=>l.loc==='event' && l.boxes>0);
       area.innerHTML = hasEvent
@@ -1688,7 +1688,7 @@ function renderCampaignList(){
   const adopt = [];
   const byPid = {};
   Object.values(L.lots).forEach(l=>{ if(l.loc==='event' && l.boxes>0) byPid[l.pid] = (byPid[l.pid]||0) + l.boxes; });
-  Object.keys(byPid).forEach(pid=>{ if(!state.campaigns.some(c=>!c.ended && campPids(c).indexOf(pid)>-1)) adopt.push(pid); });
+  Object.keys(byPid).forEach(pid=>{ if(!state.campaigns.some(c=>!c.ended && !c.archived && campPids(c).indexOf(pid)>-1)) adopt.push(pid); });
   const combo = adopt.length>1 ? `<div class="camp-card"><b>口味可以互換的活動（例如可可＋奶茶）</b><div class="line-meta">一檔活動有好幾個口味，客人一組可以自由搭配，就建立成同一個活動。</div><button class="btn btn-ghost btn-full" style="margin-top:8px;" onclick="openAdoptCampaign('${adopt[0].replace(/'/g,"\\'")}', true)">合併建立（可選多個口味）</button></div>` : '';
   const adoptHtml = adopt.length ? `<div class="section-title" style="margin-top:14px;">需要建立活動資料</div>` + combo + adopt.map(pid=>`<div class="camp-card"><b>${esc(itemName(pid))}</b>
     <div class="line-meta">庫存有「活動保留」${byPid[pid]} 盒，但還沒有活動資料，開單的「活動」頁籤會看不到。</div>
@@ -1697,43 +1697,122 @@ function renderCampaignList(){
   el.innerHTML = adoptHtml + `<div class="section-title" style="margin-top:14px;">活動叫貨</div>` + state.campaigns.slice().reverse().map(c=>{
     const sold = campaignSoldGroups(c.id, null);
     const gleft = campGiftLots(L, c).reduce((s,l)=>s+l.boxes,0);
-    return `<div class="camp-card ${c.ended?'ended':''}"><div style="display:flex;justify-content:space-between;"><b>${esc(c.name)}</b><span class="line-meta">${c.ended?'已結束 '+esc(c.endDate||''):'進行中'}</span></div>
+    return `<div class="camp-card ${(c.ended||c.archived)?'ended':''}"><div style="display:flex;justify-content:space-between;"><b>${esc(c.name)}</b><span class="line-meta">${c.archived?'已併入其他活動':(c.ended?'已結束 '+esc(c.endDate||''):'進行中')}</span></div>
       <div class="line-meta">${campPids(c).map(itemName).map(esc).join('／')}・買${c.paidPer}送${c.giftPer}${campPids(c).length>1?'（口味可搭配）':''}・叫貨 ${c.groups} 組（付費 ${c.groups*c.paidPer} 盒＋贈品 ${c.groups*c.giftPer} 盒）</div>
-      <div class="line-meta">已賣 ${sold} 組・剩 ${c.groups-sold} 組・${c.ended?'':'未送出贈品 '+gleft+' 盒'}</div>
-      <div style="display:flex;gap:8px;margin-top:8px;">${c.ended?'':`<button class="btn btn-ghost" style="flex:1;" onclick="endCampaign('${c.id}')">結束活動</button>`}
-      ${c.ended?'':`<button class="btn btn-ghost" style="flex:1;" onclick="openCampaignTopup('${c.id}')">追加組數</button><button class="btn btn-ghost" style="flex:1;" onclick="editCampaignGroups('${c.id}')">改總組數</button>`}
+      <div class="line-meta">已賣 ${sold} 組・剩 ${c.groups-sold} 組・${(c.ended||c.archived)?'':'未送出贈品 '+gleft+' 盒'}</div>
+      <div style="display:flex;gap:8px;margin-top:8px;">${(c.ended||c.archived)?'':`<button class="btn btn-ghost" style="flex:1;" onclick="endCampaign('${c.id}')">結束活動</button>`}
+      ${(c.ended||c.archived)?'':`<button class="btn btn-ghost" style="flex:1;" onclick="openCampaignTopup('${c.id}')">追加組數</button><button class="btn btn-ghost" style="flex:1;" onclick="editCampaignGroups('${c.id}')">改總組數</button></div><div style="display:flex;gap:8px;margin-top:8px;"><button class="btn btn-ghost" style="flex:1;" onclick="openCampaignAddFlavor('${c.id}')">加入其他口味／合併活動</button>`}
       ${sold===0?`<button class="btn btn-ghost" style="flex:1;color:var(--brick);" onclick="deleteCampaign('${c.id}')">刪除</button>`:''}</div></div>`;
   }).join('');
 }
+let cpRows = 0;
 function openCampaignCreate(){
+  cpRows = 0;
   document.getElementById('mName').textContent = '新增活動叫貨';
-  document.getElementById('mSpec').textContent = '例如紫纖飲買三送一，叫 10 組';
+  document.getElementById('mSpec').textContent = '可以加好幾個口味，客人一組可自由搭配';
   document.getElementById('mBody').innerHTML = `<div class="custom-form" style="padding:0;border:none;">
-    <div class="fld-lab">活動名稱</div><div class="row"><input id="cpName" placeholder="例如：紫纖飲買三送一"></div>
-    <div class="fld-lab">商品</div><div class="row"><select id="cpPid" onchange="campProductChange()">${PRODUCTS.filter(p=>p.cat==='fiber'||p.cat==='skin').map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select></div>
-    <div class="row"><div style="flex:1;"><div class="fld-lab">叫貨組數</div><input id="cpGroups" type="text" inputmode="numeric" placeholder="10"></div>
-    <div style="flex:1;"><div class="fld-lab">每組付費盒數</div><input id="cpPaid" type="text" inputmode="numeric" value="3"></div>
-    <div style="flex:1;"><div class="fld-lab">每組贈送盒數</div><input id="cpGift" type="text" inputmode="numeric" value="1"></div></div>
-    <div class="row"><div style="flex:1;"><div class="fld-lab">付費正貨每盒成本</div><input id="cpCost" type="text" inputmode="decimal"></div>
-    <div style="flex:1;"><div class="fld-lab">付費正貨放哪裡</div><select id="cpLoc"><option value="offline">線下庫存</option><option value="online">線上庫存</option></select></div></div>
-    <div class="fld-lab">叫貨日期</div><div class="row"><input id="cpDate" type="date" value="${todayTW()}"></div>
+    <div class="fld-lab">活動名稱</div><div class="row"><input id="cpName" placeholder="例如：肽纖飲買三送一"></div>
+    <div class="row"><div style="flex:1;"><div class="fld-lab">每組付費盒數</div><input id="cpPaid" type="text" inputmode="numeric" value="3" oninput="campSum()"></div>
+    <div style="flex:1;"><div class="fld-lab">每組贈送盒數</div><input id="cpGift" type="text" inputmode="numeric" value="1" oninput="campSum()"></div></div>
+    <div class="fld-lab">商品與盒數（每個口味各填付費盒數、贈品盒數）</div>
+    <div id="cpRowBox"></div>
+    <button class="mini" style="margin:4px 0 10px;" onclick="addCampRow()">＋ 加入另一個口味</button>
+    <div id="cpSum" class="line-meta" style="margin-bottom:10px;line-height:1.6;"></div>
+    <div class="row"><div style="flex:1;"><div class="fld-lab">付費正貨放哪裡</div><select id="cpLoc"><option value="offline">線下庫存</option><option value="online">線上庫存</option></select></div>
+    <div style="flex:1;"><div class="fld-lab">叫貨日期</div><input id="cpDate" type="date" value="${todayTW()}"></div></div>
     <button class="btn btn-gold btn-full" onclick="confirmCampaign()">建立活動（贈品成本 $0）</button></div>`;
   document.getElementById('mFooter').innerHTML = '';
   document.getElementById('overlay').classList.add('show');
-  campProductChange();
+  addCampRow();
 }
-function campProductChange(){ const dc = defaultCostFor(document.getElementById('cpPid').value); document.getElementById('cpCost').value = dc!=null ? dc : ''; }
+function addCampRow(){
+  const k = cpRows++;
+  const opts = PRODUCTS.filter(p=>p.cat==='fiber'||p.cat==='skin').map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  const div = document.createElement('div'); div.id = 'cpr'+k; div.style.cssText = 'border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:8px;';
+  div.innerHTML = `<div class="row"><select id="cpPid${k}" onchange="campRowCost(${k})">${opts}</select></div>
+    <div class="row"><div style="flex:1;"><div class="fld-lab">付費盒數</div><input id="cpPaidN${k}" type="text" inputmode="numeric" oninput="campSum()"></div>
+    <div style="flex:1;"><div class="fld-lab">贈品盒數</div><input id="cpGiftN${k}" type="text" inputmode="numeric" oninput="campSum()"></div>
+    <div style="flex:1;"><div class="fld-lab">每盒成本</div><input id="cpCost${k}" type="text" inputmode="decimal"></div></div>
+    ${k>0?`<button class="mini" style="margin-left:0;" onclick="document.getElementById('cpr${k}').remove();campSum();">移除這個口味</button>`:''}`;
+  document.getElementById('cpRowBox').appendChild(div);
+  campRowCost(k); campSum();
+}
+function campRowCost(k){ const dc = defaultCostFor(document.getElementById('cpPid'+k).value); document.getElementById('cpCost'+k).value = dc!=null ? dc : ''; }
+function campRows(){
+  const out = [];
+  for(let k=0;k<cpRows;k++){
+    if(!document.getElementById('cpr'+k)) continue;
+    out.push({k, pid:document.getElementById('cpPid'+k).value, paid:parseInt(document.getElementById('cpPaidN'+k).value)||0,
+      gift:parseInt(document.getElementById('cpGiftN'+k).value)||0, cost:document.getElementById('cpCost'+k).value.trim()});
+  }
+  return out;
+}
+function campSum(){
+  const el = document.getElementById('cpSum'); if(!el) return;
+  const rows = campRows(), P = rows.reduce((s,r)=>s+r.paid,0), G = rows.reduce((s,r)=>s+r.gift,0);
+  const pp = parseInt(document.getElementById('cpPaid').value)||0, gp = parseInt(document.getElementById('cpGift').value)||0;
+  const groups = gp>0 ? G/gp : 0;
+  el.innerHTML = `付費共 ${P} 盒、贈品共 ${G} 盒 → 總組數 ${Number.isInteger(groups)?groups:'（贈品盒數要是每組贈送盒數的倍數）'}` + (Number.isInteger(groups) && P!==groups*pp ? `<br><span class="warn">付費盒數應為 ${groups*pp}（${groups} 組 × ${pp} 盒），目前 ${P}</span>` : '');
+}
 async function confirmCampaign(){
-  const name = document.getElementById('cpName').value.trim(), pid = document.getElementById('cpPid').value;
-  const groups = parseInt(document.getElementById('cpGroups').value)||0, paidPer = parseInt(document.getElementById('cpPaid').value)||0, giftPer = parseInt(document.getElementById('cpGift').value)||0;
-  const raw = document.getElementById('cpCost').value.trim(), loc = document.getElementById('cpLoc').value, date = document.getElementById('cpDate').value || todayTW();
-  if(!name || groups<=0 || paidPer<=0 || giftPer<0){ alert('請填活動名稱、組數與每組盒數'); return; }
-  if(raw==='' || isNaN(Number(raw))){ alert('請填付費正貨的實際每盒成本'); return; }
-  const cid = 'c'+uid(), paidId = uid(), giftId = uid();
-  state.stockEntries.unshift({id:giftId, pid, name:itemName(pid), source:'活動贈品轉入', loc:'event', qty:groups*giftPer, unitCost:0, date, note:'活動贈品：'+name, kind:'gift', campaignId:cid});
-  state.stockEntries.unshift({id:paidId, pid, name:itemName(pid), source:loc==='online'?'線上雲倉':'線下叫貨', loc, qty:groups*paidPer, unitCost:Number(raw), date, note:'活動：'+name, kind:'purchase', campaignId:cid});
-  state.campaigns.push({id:cid, name, pid, groups, paidPer, giftPer, date, paidLotId:paidId, giftLotId:giftId, ended:false});
+  const name = document.getElementById('cpName').value.trim();
+  const paidPer = parseInt(document.getElementById('cpPaid').value)||0, giftPer = parseInt(document.getElementById('cpGift').value)||0;
+  const loc = document.getElementById('cpLoc').value, date = document.getElementById('cpDate').value || todayTW();
+  const rows = campRows().filter(r=>r.paid>0||r.gift>0);
+  if(!name || paidPer<=0 || giftPer<=0 || !rows.length){ alert('請填活動名稱、每組盒數，並至少填一個商品的盒數'); return; }
+  if(new Set(rows.map(r=>r.pid)).size!==rows.length){ alert('同一個商品請只填一列'); return; }
+  const P = rows.reduce((s,r)=>s+r.paid,0), G = rows.reduce((s,r)=>s+r.gift,0), groups = G/giftPer;
+  if(!Number.isInteger(groups) || groups<=0){ alert('贈品盒數合計要是每組贈送盒數的倍數'); return; }
+  if(P!==groups*paidPer){ alert('付費盒數合計應為 '+groups*paidPer+'（'+groups+' 組 × '+paidPer+' 盒），目前是 '+P); return; }
+  if(rows.some(r=>r.paid>0 && (r.cost==='' || isNaN(Number(r.cost))))){ alert('請填每個口味付費正貨的實際每盒成本'); return; }
+  const cid = 'c'+uid(); let paidId = null, giftId = null;
+  rows.forEach(r=>{
+    if(r.gift>0){ const id = uid(); if(rows.length===1) giftId = id; state.stockEntries.unshift({id, pid:r.pid, name:itemName(r.pid), source:'活動贈品轉入', loc:'event', qty:r.gift, unitCost:0, date, note:'活動贈品：'+name, kind:'gift', campaignId:cid}); }
+    if(r.paid>0){ const id = uid(); if(rows.length===1) paidId = id; state.stockEntries.unshift({id, pid:r.pid, name:itemName(r.pid), source:loc==='online'?'線上雲倉':'線下叫貨', loc, qty:r.paid, unitCost:Number(r.cost), date, note:'活動：'+name, kind:'purchase', campaignId:cid}); }
+  });
+  state.campaigns.push({id:cid, name, pid:rows[0].pid, pids:rows.map(r=>r.pid), groups, paidPer, giftPer, date, paidLotId:paidId, giftLotId:giftId, ended:false});
   await Promise.all([saveStock(), saveCampaigns()]); closeModal(); renderStockTab(); renderProducts();
+}
+// 把其他口味加進既有活動，或把另一個進行中的活動合併進來
+function openCampaignAddFlavor(cid){
+  const c = state.campaigns.find(x=>x.id===cid); if(!c) return;
+  const L = computeLots(), ev = {};
+  Object.values(L.lots).forEach(l=>{ if(l.loc==='event' && l.boxes>0) ev[l.pid] = (ev[l.pid]||0) + l.boxes; });
+  const cur = campPids(c), others = state.campaigns.filter(x=>x.id!==cid && !x.ended && !x.archived);
+  const cand = PRODUCTS.filter(p=>(p.cat==='fiber'||p.cat==='skin') && cur.indexOf(p.id)<0).map(p=>{
+    const oc = others.find(x=>campPids(x).indexOf(p.id)>-1); return {pid:p.id, oc, evn:ev[p.id]||0};
+  }).filter(x=>x.oc || x.evn>0);
+  window.__afCand = cand.map(x=>x.pid);
+  document.getElementById('mName').textContent = '加入其他口味';
+  document.getElementById('mSpec').textContent = c.name+'・目前包含：'+cur.map(itemName).join('／');
+  document.getElementById('mBody').innerHTML = `<div class="custom-form" style="padding:0;border:none;">
+    ${cand.length ? '<div class="fld-lab">勾選要加進這檔活動的口味</div>' + cand.map((x,k)=>`<label style="display:flex;align-items:flex-start;gap:8px;padding:8px 2px;font-size:14px;"><input type="checkbox" class="afChk" data-k="${k}" ${x.oc?'checked':''} style="width:20px;height:20px;margin-top:2px;"><span>${esc(itemName(x.pid))}
+      <div class="line-meta">${x.oc ? '目前屬於「'+esc(x.oc.name)+'」（剩 '+(x.oc.groups-campaignSoldGroups(x.oc.id,null))+' 組）。合併後那個活動會封存，已賣紀錄保留，剩餘組數加進這個活動。' : '活動保留 '+x.evn+' 盒'}</div></span></label>`).join('') : '<div class="empty" style="padding:10px;">目前沒有其他口味有活動保留的貨，或可以合併的活動。</div>'}
+    <div class="fld-lab">或選別的商品（不勾也可以）</div><div class="row"><select id="afSel"><option value="">不加</option>${PRODUCTS.filter(p=>(p.cat==='fiber'||p.cat==='skin') && cur.indexOf(p.id)<0).map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select></div>
+    <div class="line-meta" style="margin-bottom:10px;line-height:1.6;">庫存不會被動到。加入的口味，開單時可以跟原本口味自由搭配；它的付費正貨和贈品數量要在庫存裡已經登記好。</div>
+    <button class="btn btn-gold btn-full" onclick="confirmAddFlavor('${c.id}')">加入</button></div>`;
+  document.getElementById('mFooter').innerHTML = '';
+  document.getElementById('overlay').classList.add('show');
+}
+async function confirmAddFlavor(cid){
+  const c = state.campaigns.find(x=>x.id===cid); if(!c) return;
+  const add = [];
+  document.querySelectorAll('.afChk').forEach(e=>{ if(e.checked) add.push(window.__afCand[+e.dataset.k]); });
+  const sel = document.getElementById('afSel').value; if(sel) add.push(sel);
+  if(!add.length){ alert('請至少選一個口味'); return; }
+  let pids = campPids(c).slice(), merged = [];
+  add.forEach(pid=>{
+    if(pids.indexOf(pid)>-1) return;
+    const oc = state.campaigns.find(x=>x.id!==cid && !x.ended && !x.archived && campPids(x).indexOf(pid)>-1);
+    if(oc){
+      campPids(oc).forEach(p=>{ if(pids.indexOf(p)<0) pids.push(p); });
+      c.groups += Math.max(0, oc.groups - campaignSoldGroups(oc.id, null));
+      oc.archived = true; oc.mergedInto = cid; merged.push(oc.name);
+    } else pids.push(pid);
+  });
+  c.pids = pids;
+  await saveCampaigns(); closeModal(); renderStockTab(); renderProducts();
+  alert('已加入。這檔活動現在包含：'+pids.map(itemName).join('、')+'；總組數 '+c.groups+' 組'+(merged.length?'（已併入：'+merged.join('、')+'）':''));
 }
 async function endCampaign(cid){
   const c = state.campaigns.find(x=>x.id===cid); if(!c) return;
@@ -1756,7 +1835,7 @@ let adoptPids = [];
 function openAdoptCampaign(pid, combo){
   const L = computeLots();
   const ev = {}; Object.values(L.lots).forEach(l=>{ if(l.loc==='event' && l.boxes>0) ev[l.pid] = (ev[l.pid]||0) + l.boxes; });
-  adoptPids = Object.keys(ev).filter(p=>!state.campaigns.some(c=>!c.ended && campPids(c).indexOf(p)>-1));
+  adoptPids = Object.keys(ev).filter(p=>!state.campaigns.some(c=>!c.ended && !c.archived && campPids(c).indexOf(p)>-1));
   if(adoptPids.indexOf(pid)<0) adoptPids.unshift(pid);
   const checked = p => combo ? true : p===pid;
   document.getElementById('mName').textContent = combo ? '建立活動資料（多口味）' : '建立活動資料';
